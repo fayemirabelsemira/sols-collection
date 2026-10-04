@@ -504,3 +504,8 @@ main>.books-section:first-child{padding-top:60px}
   .continue-cover{min-height:120px;border-right:1px solid var(--border);border-bottom:none}
   .continue-information{padding:14px}
 }
+
+/* ===== Author section only (welcome text + buttons removed) ===== */
+.hero{min-height:0;padding:90px 0}
+.hero-inner{grid-template-columns:1fr;max-width:1000px}
+#about.about-card{width:100%;margin:0 auto}
