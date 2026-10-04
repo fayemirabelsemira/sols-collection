@@ -513,3 +513,37 @@ main>.books-section:first-child{padding-top:60px}
 /* Author role links (Wattpad / Dreame) */
 .about-role a{color:var(--gold-hi);font-weight:700;text-decoration:underline;text-decoration-color:rgba(229,193,88,.5);text-underline-offset:3px;transition:color var(--ease),text-decoration-color var(--ease)}
 .about-role a:hover{color:#fff;text-decoration-color:#fff}
+
+/* ===== MOBILE READER: compact bars, slide-out chapters, hide-menu button ===== */
+.focus-toggle,.drawer-backdrop{display:none}
+
+@media(max-width:900px){
+  /* smaller top bar + toolbar */
+  .reader-topbar{height:52px;padding:0 12px}
+  .reader-back-button{font-size:13px}
+  .reader-book-title{max-width:38vw;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:13px}
+  .reader-progress-top{font-size:12px;padding:3px 10px}
+  .reader-toolbar{flex-wrap:nowrap;overflow-x:auto;padding:8px 12px;gap:8px;-webkit-overflow-scrolling:touch}
+  .reader-toolbar>*{flex-shrink:0}
+  .toolbar-btn{padding:6px 12px;font-size:12px}
+  .font-select{padding:6px 8px;font-size:12px}
+  .toolbar-label{display:none}
+
+  /* chapters become a slide-out drawer instead of taking screen space */
+  .reader-layout,.reader-layout.sidebar-hidden{grid-template-columns:1fr;grid-template-rows:1fr}
+  .chapter-sidebar{position:fixed;top:0;left:0;bottom:0;width:min(280px,78vw);height:auto;max-height:none;z-index:60;
+    border-right:1px solid var(--border);border-bottom:none;box-shadow:12px 0 40px rgba(0,0,0,.5);
+    visibility:visible;transition:transform .25s ease}
+  .reader-layout.sidebar-hidden .chapter-sidebar{display:block!important;transform:translateX(-105%);box-shadow:none;
+    visibility:hidden;transition:transform .25s ease,visibility 0s .25s}
+  .drawer-backdrop{display:block;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:50;opacity:1;transition:opacity .25s ease}
+  .reader-layout.sidebar-hidden .drawer-backdrop{opacity:0;pointer-events:none}
+
+  /* floating button to hide / show all menus */
+  .focus-toggle{display:inline-flex;align-items:center;position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:70;
+    padding:10px 16px;border-radius:999px;border:1px solid var(--gold);background:var(--surface);color:var(--gold-hi);
+    font-size:12px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.45);opacity:.92}
+  #readerSection.focus-mode .reader-topbar,
+  #readerSection.focus-mode .reader-toolbar{display:none}
+  #readerSection.focus-mode .story-reader{padding-top:28px}
+}
