@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sol's Collection</title>
+<meta name="description" content="Stories that stay with you.">
+<meta name="theme-color" content="#0d0d0d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="site-header">
+  <div class="header-inner">
+    <a href="#top" class="logo">
+      <!-- LOGO: to use your own image, replace the "S" with:
+             <img src="images/logo.svg" alt="Sol's Collection logo">  -->
+      <div class="logo-symbol"><img src="images/author.png" alt="Sol's Collection"></div>
+      <div class="logo-text">
+        <span class="logo-name">Sol's Collection</span>
+        <span class="logo-tagline">Stories you'll keep coming back to.</span>
+      </div>
+    </a>
+    <nav class="main-nav">
+      <a href="#top">Home</a>
+      <a href="#books">Books</a>
+      <a href="#genres">Genres</a>
+      <a href="#about">About</a>
+      <button id="themeToggle" class="theme-button" type="button" aria-label="Toggle theme">☾</button>
+      <button id="loginNavButton" class="nav-button" type="button">Login</button>
+      <button id="signupNavButton" class="nav-button primary" type="button">Sign Up</button>
+      <button id="logoutButton" class="nav-button logout-button hidden" type="button">Logout</button>
+    </nav>
+    <button id="mobileMenuButton" class="mobile-menu-button" type="button" aria-label="Open menu">☰</button>
+  </div>
+</header>
+
+<!-- MOBILE MENU -->
+<div id="mobileMenu" class="mobile-menu">
+  <a href="#top">Home</a>
+  <a href="#books">Books</a>
+  <a href="#genres">Genres</a>
+  <a href="#about">About</a>
+  <button id="mobileLoginButton" type="button">Login</button>
+  <button id="mobileSignupButton" type="button">Sign Up</button>
+  <button id="mobileLogoutButton" type="button" class="hidden">Logout</button>
+</div>
+
+<main id="top">
+
+<!-- BOOKS -->
+<section id="books" class="section books-section">
+  <div class="section-heading">
+    <p class="section-label">FAIR WARNING</p>
+    <h2>Love This Dangerous Should Be Illegal</h2>
+    <p>Read the first 5 chapters free. We dare you to stop at one.</p>
+  </div>
+
+  <div class="books-controls">
+    <div class="search-box">
+      <input type="text" id="bookSearch" placeholder="Search books..." autocomplete="off">
+      <span class="search-icon">⌕</span>
+    </div>
+    <div class="sort-bar">
+      <button class="sort-button active" data-sort="latest" type="button">Latest</button>
+      <button class="sort-button" data-sort="popular" type="button">Most Popular</button>
+      <button class="sort-button" data-sort="voted" type="button">Top Voted</button>
+    </div>
+  </div>
+
+  <div id="booksGrid" class="books-grid"><!-- Books are loaded from Supabase --></div>
+  <div id="booksLoading" class="loading-message">Loading books...</div>
+  <div id="booksEmpty" class="empty-message hidden">No books are available yet.</div>
+</section>
+
+<!-- CONTINUE READING -->
+<section id="continueReading" class="section continue-section">
+  <div class="section-heading">
+    <p class="section-label">YOUR READING JOURNEY</p>
+    <h2>Continue Reading</h2>
+  </div>
+  <div id="continueCard" class="continue-card">
+    <div id="continueCover" class="continue-cover"><span>SC</span></div>
+    <div class="continue-information">
+      <p class="continue-label">CURRENTLY READING</p>
+      <h3 id="continueTitle">Vengeance Resurrection</h3>
+      <p id="continueChapter">Chapter 1</p>
+      <div class="progress-container">
+        <div id="continueProgress" class="progress-bar" style="width: 0%"></div>
+      </div>
+      <div class="progress-information">
+        <span id="progressPercent">0%</span>
+        <span id="progressNumbers">1 / 49</span>
+      </div>
+      <button id="continueButton" class="read-button" type="button">Continue Reading</button>
+    </div>
+  </div>
+</section>
+
+<!-- GENRES -->
+<section id="genres" class="section genres-section">
+  <div class="section-heading">
+    <p class="section-label">FIND YOUR NEXT STORY</p>
+    <h2>Genres</h2>
+  </div>
+  <div class="genres-grid">
+    <button class="genre-card" type="button" data-genre="Romance">Romance</button>
+    <button class="genre-card" type="button" data-genre="Drama">Drama</button>
+    <button class="genre-card" type="button" data-genre="Revenge">Revenge</button>
+    <button class="genre-card" type="button" data-genre="Fantasy">Fantasy</button>
+    <button class="genre-card" type="button" data-genre="Mystery">Mystery</button>
+    <button class="genre-card" type="button" data-genre="Dark Romance">Dark Romance</button>
+  </div>
+</section>
+
+<!-- HERO + ABOUT THE CREATOR (combined) -->
+<section id="welcome" class="hero">
+  <div class="hero-overlay"></div>
+  <div class="hero-inner">
+
+    <div class="hero-content">
+      <p class="hero-small">WELCOME TO</p>
+      <h1>Sol's Collection</h1>
+      <div class="hero-buttons">
+        <a href="#books" class="hero-button primary">Explore Books</a>
+        <button id="heroContinueButton" class="hero-button secondary" type="button">Continue Reading</button>
+      </div>
+    </div>
+
+    <div id="about" class="about-card">
+      <aside class="about-profile">
+        <div class="about-avatar">
+          <img src="images/author.png" alt="LadyySol">
+        </div>
+        <h3 class="about-name">LadyySol</h3>
+        <p class="about-handle">a.k.a. solitary_lady</p>
+        <p class="about-role">BSIT Student &amp; Creative Storyteller</p>
+      </aside>
+
+      <div class="about-body">
+        <p class="section-label">ABOUT THE CREATOR</p>
+        <h2>Ladyysol <span class="about-alias">(solitary_lady)</span></h2>
+        <blockquote class="about-quote">
+          “I write the kind of love you know you should run from but secretly hope will chase you.”
+          — Miss Sol
+        </blockquote>
+        <p>Behind Sol’s Collection is a writer who finds beauty in the darker sides of love.</p>
+        <p>But beyond the stories, I’m also a BSIT student specializing in Cloud Computing, with skills in programming, web development, databases, and building digital experiences.</p>
+        <p>Every story here carries a piece of imagination, emotion, and countless hours of work.</p>
+        <p>So if you’re looking for a story that will make you smile and twisted…</p>
+        <p class="about-welcome">Welcome to Sol’s Collection.</p>
+        <ul class="skill-badges">
+          <li>Writing &amp; Scriptwriting</li>
+          <li>Web Development (HTML/CSS/JS)</li>
+          <li>UI/UX Design</li>
+          <li>Database &amp; Systems</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</main>
+
+<!-- BOOK INFORMATION MODAL -->
+<div id="bookModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-box book-modal-box">
+    <button class="modal-close" data-close="bookModal" type="button" aria-label="Close">×</button>
+    <div id="modalBookCover" class="modal-book-cover">SC</div>
+    <div class="modal-book-information">
+      <p id="modalBookGenre" class="modal-category">Romance</p>
+      <h2 id="modalBookTitle">Vengeance Resurrection</h2>
+      <p id="modalBookAuthor">By Sol</p>
+      <p id="modalBookDescription">Loading description...</p>
+      <!-- Views, Votes & Vote Button are injected here by JS -->
+      <div class="book-features">
+        <div><strong id="modalFreeChapters">5</strong><span>Free Chapters</span></div>
+        <div><strong>₱150</strong><span>Full Access</span></div>
+        <div><strong>∞</strong><span>Lifetime Access</span></div>
+      </div>
+      <button id="startReadingButton" class="read-button large" type="button">Start Reading</button>
+    </div>
+  </div>
+</div>
+
+<!-- READER -->
+<section id="readerSection" class="reader-section hidden">
+
+  <div class="reader-topbar">
+    <button id="closeReaderButton" class="reader-back-button" type="button">← Back to Books</button>
+    <div class="reader-book-title"><span id="readerBookTitle">Vengeance Resurrection</span></div>
+    <div class="reader-progress-top"><span id="readerProgressText">0%</span></div>
+  </div>
+
+  <div class="reader-toolbar">
+    <button id="toggleSidebar" class="toolbar-btn" type="button" title="Toggle Chapters">☰ Chapters</button>
+    <div class="toolbar-group">
+      <button id="fontDecrease" class="toolbar-btn" type="button" title="Decrease font">A−</button>
+      <button id="fontIncrease" class="toolbar-btn" type="button" title="Increase font">A+</button>
+    </div>
+    <div class="toolbar-group">
+      <select id="fontFamily" class="font-select">
+        <option value="Georgia, 'Times New Roman', serif">Serif (Classic)</option>
+        <option value="'Palatino Linotype', Palatino, serif">Palatino</option>
+        <option value="'Merriweather', Georgia, serif">Merriweather</option>
+        <option value="Arial, Helvetica, sans-serif">Sans</option>
+        <option value="'Courier New', Courier, monospace">Mono</option>
+      </select>
+    </div>
+    <div class="toolbar-group theme-group">
+      <span class="toolbar-label">Page</span>
+      <button class="theme-swatch" type="button" data-reader-theme="white" title="White" aria-label="White page"></button>
+      <button class="theme-swatch" type="button" data-reader-theme="beige" title="Beige" aria-label="Beige page"></button>
+      <button class="theme-swatch" type="button" data-reader-theme="black" title="Black" aria-label="Black page"></button>
+    </div>
+  </div>
+
+  <div class="reader-layout">
+    <aside class="chapter-sidebar">
+      <div class="sidebar-header">
+        <p>CHAPTERS</p>
+        <h3 id="sidebarBookTitle">Vengeance Resurrection</h3>
+      </div>
+      <div id="chapterList" class="chapter-list"><!-- Chapters loaded by JavaScript --></div>
+    </aside>
+
+    <article class="story-reader">
+      <div class="story-header">
+        <p id="readerCategory" class="reader-category">Romance</p>
+        <h1 id="chapterHeading"></h1>
+        <div class="reader-stats">
+          <span id="readerViews">👁 0</span>
+          <span id="readerVotes">☀ 0</span>
+        </div>
+      </div>
+
+      <div id="storyContent" class="story-content">Loading...</div>
+
+      <div class="reader-navigation">
+        <button id="previousChapter" class="reader-nav-button" type="button">← Previous</button>
+        <button id="nextChapter" class="reader-nav-button primary" type="button">Next →</button>
+      </div>
+    </article>
+  </div>
+</section>
+
+<!-- PAYMENT MODAL -->
+<div id="paymentModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-box payment-box">
+    <button class="modal-close" data-close="paymentModal" type="button" aria-label="Close">×</button>
+    <div class="payment-icon">₱</div>
+    <p class="section-label">FULL ACCESS</p>
+    <h2>Unlock the Story</h2>
+    <p>Get lifetime access to all remaining chapters.</p>
+    <h3 id="paymentChapterTitle">Full Book Access</h3>
+    <div class="payment-price">₱<span id="paymentAmount">150</span></div>
+    <p class="payment-lifetime">♾ Lifetime access • One-time payment</p>
+    <button id="demoPaymentButton" class="payment-button" type="button">Pay ₱150 with GCash</button>
+    <p class="demo-warning">You will be redirected to PayMongo to complete the payment securely.</p>
+  </div>
+</div>
+
+<!-- LOGIN MODAL -->
+<div id="loginModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-box auth-box">
+    <button class="modal-close" data-close="loginModal" type="button" aria-label="Close">×</button>
+    <p class="section-label">WELCOME BACK</p>
+    <h2>Login</h2>
+    <form id="loginForm">
+      <label for="loginEmail">Email</label>
+      <input id="loginEmail" type="email" placeholder="you@example.com" required>
+      <label for="loginPassword">Password</label>
+      <input id="loginPassword" type="password" placeholder="Your password" required>
+      <button type="submit" class="auth-submit">Login</button>
+    </form>
+    <p class="auth-switch">Don't have an account? <button id="switchToSignup" type="button">Sign Up</button></p>
+  </div>
+</div>
+
+<!-- SIGN UP MODAL -->
+<div id="signupModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-box auth-box">
+    <button class="modal-close" data-close="signupModal" type="button" aria-label="Close">×</button>
+    <p class="section-label">JOIN THE COLLECTION</p>
+    <h2>Create Account</h2>
+    <form id="signupForm">
+      <label for="signupName">Display Name</label>
+      <input id="signupName" type="text" placeholder="Your name" required>
+      <label for="signupEmail">Email</label>
+      <input id="signupEmail" type="email" placeholder="you@example.com" required>
+      <label for="signupPassword">Password</label>
+      <input id="signupPassword" type="password" placeholder="At least 6 characters" minlength="6" required>
+      <button type="submit" class="auth-submit">Create Account</button>
+    </form>
+    <p class="auth-switch">Already have an account? <button id="switchToLogin" type="button">Login</button></p>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer class="site-footer">
+  <div class="footer-logo">Sol's Collection</div>
+  <p>Stories you'll keep coming back to.</p>
+  <p class="copyright">© 2026 Sol's Collection. All rights reserved.</p>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/script.js"></script>
+<script src="js/reader-theme.js"></script>
+</body>
+</html>
