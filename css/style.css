@@ -509,3 +509,7 @@ main>.books-section:first-child{padding-top:60px}
 .hero{min-height:0;padding:90px 0}
 .hero-inner{grid-template-columns:1fr;max-width:1000px}
 #about.about-card{width:100%;margin:0 auto}
+
+/* Author role links (Wattpad / Dreame) */
+.about-role a{color:var(--gold-hi);font-weight:700;text-decoration:underline;text-decoration-color:rgba(229,193,88,.5);text-underline-offset:3px;transition:color var(--ease),text-decoration-color var(--ease)}
+.about-role a:hover{color:#fff;text-decoration-color:#fff}
