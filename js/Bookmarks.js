@@ -1,30 +1,33 @@
 /* =========================================================
-   BOOKMARKS
-   - Long-press a line in the reader (or tap the toolbar
-     button) to bookmark it.
-   - Bookmarks are listed in the book modal; tapping one
-     opens the chapter and scrolls to the line.
-   - Stored in localStorage (key: solBookmarks.v1).
+   BOOKMARKS (select text -> bookmark it)
+   - Select (or copy-select) any passage in a chapter, then tap
+     the little bookmark button that appears, or the bookmark
+     icon in the reader toolbar.
+   - Saved passages are highlighted in the chapter. Tap a
+     highlight to remove it.
+   - Bookmarks are listed in the book modal (above Start
+     Reading); tapping one opens the chapter and jumps to it.
+   - Saved on the device (localStorage) and, when the reader is
+     logged in, synced to the Supabase `bookmarks` table.
    Needs window.SolReader (bottom of script.js).
+   File must be saved as js/bookmarks.js (all lowercase).
 ========================================================= */
 (function () {
     "use strict";
 
     var STORE_KEY = "solBookmarks.v1";
-    var HINT_KEY = "solBookmarkHint";
-    var LONG_PRESS_MS = 480;
-    var MOVE_TOLERANCE = 10;
+    var HINT_KEY = "solBookmarkHint2";
     var COLLAPSED_COUNT = 4;
-    var SNIPPET_LEN = 120;
-    var BLOCK_TAGS = { P: 1, DIV: 1, BLOCKQUOTE: 1, LI: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1 };
+    var MAX_LEN = 800;
 
     var content = document.getElementById("storyContent");
     var reducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    var pendingJump = null;      // { chapterId, line, text, expires }
+    var pendingJump = null;      // { chapterId, id, expires }
     var showingAll = false;
     var modalBook = null;
     var observer = null;
+    var lastSel = null;          // most recent text selection in the chapter
 
     /* ---------- storage ---------- */
 
@@ -47,14 +50,9 @@
 
     /* ---------- helpers ---------- */
 
+    function same(a, b) { return String(a) === String(b); }
+
     function norm(t) { return (t || "").replace(/\s+/g, " ").trim(); }
-
-    function snippetOf(el) {
-        var t = norm(el.textContent);
-        return t.length > SNIPPET_LEN ? t.slice(0, SNIPPET_LEN).replace(/\s+\S*$/, "") + "…" : t;
-    }
-
-    function prefixOf(t) { return norm(t).replace(/…$/, "").slice(0, 40); }
 
     function ago(ts) {
         var days = Math.floor((Date.now() - ts) / 86400000);
@@ -68,8 +66,8 @@
         return window.SolReader ? window.SolReader.state() : { book: null, chapter: null };
     }
 
-    function linesIn(root) {
-        return Array.prototype.slice.call(root.querySelectorAll(".bm-line"));
+    function isCoarse() {
+        return !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
     }
 
     /* ---------- toast ---------- */
@@ -108,156 +106,161 @@
         if (toastEl) toastEl.classList.remove("show");
     }
 
-    /* ---------- wrap chapter text into numbered, bookmarkable lines ----------
-       Works whether the chapter is <p> blocks or plain text with newlines. */
-
-    function decorate() {
-        if (!content) return;
-        var st = readerState();
-        if (!st.chapter) return;
-        if (content.querySelector(".bm-line")) return;       // already done
-        if (norm(content.textContent).length < 80) return;   // loading / error text
-
-        /* If the chapter is wrapped in a single <div>, work inside it */
-        var root = content;
-        for (var depth = 0; depth < 3; depth++) {
-            var kids = Array.prototype.slice.call(root.childNodes);
-            var elements = kids.filter(function (n) { return n.nodeType === 1; });
-            var strayText = kids.some(function (n) { return n.nodeType === 3 && n.textContent.trim(); });
-            if (elements.length === 1 && !strayText && elements[0].tagName === "DIV") root = elements[0];
-            else break;
-        }
-
-        if (observer) observer.disconnect();
-
-        var frag = document.createDocumentFragment();
-        var current = null;
-        var count = 0;
-
-        function close() { current = null; }
-        function open() {
-            if (!current) {
-                current = document.createElement("span");
-                current.className = "bm-line";
-                frag.appendChild(current);
-            }
-            return current;
-        }
-
-        Array.prototype.slice.call(root.childNodes).forEach(function (node) {
-            if (node.nodeType === 3) {
-                node.textContent.split(/(\n+)/).forEach(function (piece) {
-                    if (!piece) return;
-                    if (/^\n+$/.test(piece)) {
-                        close();
-                        frag.appendChild(document.createTextNode(piece));
-                    } else if (!piece.trim() && !current) {
-                        frag.appendChild(document.createTextNode(piece));
-                    } else {
-                        open().appendChild(document.createTextNode(piece));
-                    }
-                });
-            } else if (node.nodeType === 1) {
-                if (node.tagName === "BR") {
-                    close();
-                    frag.appendChild(node);
-                } else if (BLOCK_TAGS[node.tagName]) {
-                    close();
-                    if (norm(node.textContent)) node.classList.add("bm-line");
-                    frag.appendChild(node);
-                } else {
-                    open().appendChild(node);
-                }
-            } else {
-                frag.appendChild(node);
-            }
-        });
-
-        root.textContent = "";
-        root.appendChild(frag);
-
-        linesIn(content).forEach(function (el, i) {
-            el.setAttribute("data-bm-line", i);
-            count++;
-        });
-
-        content.setAttribute("data-bm-chapter", st.chapter.id);
-        refreshMarks();
-        reobserve();
-
-        if (pendingJump && pendingJump.chapterId === st.chapter.id && Date.now() < pendingJump.expires) {
-            var job = pendingJump;
-            pendingJump = null;
-            setTimeout(function () { jumpToLine(job); }, 60);
-            setTimeout(function () { ensureVisible(job); }, 700);
-        } else if (count) {
-            maybeShowHint();
-        }
-    }
-
-    function reobserve() {
-        if (observer && content) observer.observe(content, { childList: true });
-    }
-
-    /* ---------- marks in the reader ---------- */
+    /* ---------- bookmarks for the chapter on screen ---------- */
 
     function currentChapterBookmarks() {
         var st = readerState();
         if (!st.book || !st.chapter) return [];
         return load().filter(function (b) {
-            return b.bookId === st.book.id && b.chapterId === st.chapter.id;
+            return same(b.bookId, st.book.id) && same(b.chapterId, st.chapter.id);
         });
     }
 
-    /* Find the line for a bookmark; fall back to a text match if the chapter was edited */
-    function resolveLine(bm, lines) {
-        var at = lines[bm.line];
-        var want = prefixOf(bm.text);
-        if (at && (!want || norm(at.textContent).indexOf(want) === 0)) return at;
-        for (var i = 0; i < lines.length; i++) {
-            if (want && norm(lines[i].textContent).indexOf(want) === 0) return lines[i];
+    /* Where is this bookmark in the chapter text? Returns [start, end] or null.
+       `line` holds the start offset; the saved text is used to double-check it
+       (and to find the passage again if the chapter was edited). */
+    function resolveRange(bm, full) {
+        var t = bm.text || "";
+        if (!t) return null;
+        if (typeof bm.line === "number" && full.substr(bm.line, t.length) === t) {
+            return [bm.line, bm.line + t.length];
         }
-        return at || null;
+        var i = full.indexOf(t);
+        if (i !== -1) return [i, i + t.length];
+        var cut = t.replace(/\u2026$/, "").trim();      // old bookmarks ended with an ellipsis
+        if (cut.length >= 12) {
+            i = full.indexOf(cut);
+            if (i !== -1) return [i, i + cut.length];
+        }
+        return null;
     }
 
-    function refreshMarks() {
+    /* ---------- highlight saved passages ---------- */
+
+    function withoutObserving(fn) {
+        if (observer) observer.disconnect();
+        try { fn(); }
+        finally { if (observer && content) observer.observe(content, { childList: true }); }
+    }
+
+    function clearMarks() {
+        var marks = content.querySelectorAll("mark.bm-hl");
+        Array.prototype.forEach.call(marks, function (m) {
+            var p = m.parentNode;
+            if (!p) return;
+            while (m.firstChild) p.insertBefore(m.firstChild, m);
+            p.removeChild(m);
+            p.normalize();
+        });
+    }
+
+    function wrapSpans(spans) {
+        var walker = document.createTreeWalker(content, NodeFilter.SHOW_TEXT, null);
+        var nodes = [], pos = 0, n;
+        while ((n = walker.nextNode())) {
+            nodes.push({ node: n, s: pos, e: pos + n.nodeValue.length });
+            pos += n.nodeValue.length;
+        }
+
+        nodes.forEach(function (item) {
+            var hits = spans.filter(function (sp) { return sp.s < item.e && sp.e > item.s; });
+            if (!hits.length) return;
+
+            var cuts = [item.s, item.e];
+            hits.forEach(function (sp) {
+                if (sp.s > item.s && sp.s < item.e) cuts.push(sp.s);
+                if (sp.e > item.s && sp.e < item.e) cuts.push(sp.e);
+            });
+            cuts = cuts.filter(function (v, i, a) { return a.indexOf(v) === i; }).sort(function (a, b) { return a - b; });
+
+            var frag = document.createDocumentFragment();
+            for (var i = 0; i < cuts.length - 1; i++) {
+                var a = cuts[i], b = cuts[i + 1];
+                var piece = item.node.nodeValue.slice(a - item.s, b - item.s);
+                var ids = hits.filter(function (sp) { return sp.s <= a && sp.e >= b; })
+                              .map(function (sp) { return sp.id; });
+                if (ids.length) {
+                    var mk = document.createElement("mark");
+                    mk.className = "bm-hl";
+                    mk.setAttribute("data-bm-ids", ids.join(" "));
+                    mk.textContent = piece;
+                    frag.appendChild(mk);
+                } else {
+                    frag.appendChild(document.createTextNode(piece));
+                }
+            }
+            item.node.parentNode.replaceChild(frag, item.node);
+        });
+    }
+
+    function applyHighlights() {
         if (!content) return;
-        var lines = linesIn(content);
-        lines.forEach(function (el) { el.classList.remove("is-bookmarked"); });
-        currentChapterBookmarks().forEach(function (bm) {
-            var el = resolveLine(bm, lines);
-            if (el) el.classList.add("is-bookmarked");
+        var st = readerState();
+        if (!st.chapter) return;
+        if (norm(content.textContent).length < 80) return;   // still loading / error text
+
+        var count = 0;
+        withoutObserving(function () {
+            clearMarks();
+            var full = content.textContent;
+            var spans = [];
+            currentChapterBookmarks().forEach(function (bm) {
+                var r = resolveRange(bm, full);
+                if (r) spans.push({ s: r[0], e: r[1], id: bm.id });
+            });
+            count = spans.length;
+            if (spans.length) wrapSpans(spans);
         });
+
+        content.setAttribute("data-bm-chapter", st.chapter.id);
+        updateToolbarState();
+        try { document.dispatchEvent(new CustomEvent("sol:chapter-rendered")); } catch (e) {}
+
+        if (pendingJump && same(pendingJump.chapterId, st.chapter.id) && Date.now() < pendingJump.expires) {
+            var job = pendingJump;
+            pendingJump = null;
+            setTimeout(function () { jumpTo(job); }, 80);
+            setTimeout(function () { ensureVisible(job); }, 800);
+            setTimeout(function () { ensureVisible(job); }, 1600);
+        } else if (!count) {
+            maybeShowHint();
+        }
     }
 
-    function findBookmark(line) {
-        var lines = linesIn(content);
-        var found = null;
-        currentChapterBookmarks().forEach(function (bm) {
-            if (resolveLine(bm, lines) === line) found = bm;
-        });
-        return found;
+    function updateToolbarState() {
+        var btn = document.getElementById("bookmarkHere");
+        if (!btn) return;
+        var has = currentChapterBookmarks().length > 0;
+        btn.classList.toggle("has-marks", has);
     }
 
-    function addBookmark(line) {
+    /* ---------- add / remove ---------- */
+
+    function persistFailed() {
+        toast("Couldn't save. Browser storage is full or blocked.");
+    }
+
+    function addBookmark(sel) {
         var st = readerState();
         if (!st.book || !st.chapter) return null;
+        var full = content.textContent;
+        var text = full.slice(sel.start, sel.end);
+        if (!text.trim()) return null;
+
         var bm = {
             id: uid(),
             bookId: st.book.id,
             chapterId: st.chapter.id,
             chapterNumber: st.chapter.chapter_number,
             chapterTitle: st.chapter.title || "",
-            line: Number(line.getAttribute("data-bm-line")),
-            text: snippetOf(line),
+            line: sel.start,
+            text: text,
             created: Date.now()
         };
         var list = load();
         list.push(bm);
-        if (!save(list)) {
-            toast("Couldn't save. Browser storage is full or blocked.");
-            return null;
-        }
+        if (!save(list)) { persistFailed(); return null; }
+        push({ id: bm.id, op: "up", bm: bm });
         return bm;
     }
 
@@ -269,132 +272,268 @@
             return true;
         });
         save(next);
+        if (removed) push({ id: removed.id, op: "del" });
         return removed;
     }
 
-    function restoreBookmark(bm) {
+    function restoreBookmarks(items) {
         var list = load();
-        list.push(bm);
+        items.forEach(function (bm) {
+            list.push(bm);
+            push({ id: bm.id, op: "up", bm: bm });
+        });
         save(list);
-        refreshMarks();
+        applyHighlights();
         if (modalBook) renderModal(modalBook);
     }
 
-    function toggleLine(line) {
-        var existing = findBookmark(line);
-        if (existing) {
-            removeBookmark(existing.id);
-            refreshMarks();
-            toast("Bookmark removed", "Undo", function () { restoreBookmark(existing); });
+    function bookmarkSelection(sel) {
+        if (!sel) return;
+        var full = content.textContent;
+        var dupe = currentChapterBookmarks().some(function (b) {
+            var r = resolveRange(b, full);
+            return r && r[0] === sel.start && r[1] === sel.end;
+        });
+        if (dupe) {
+            toast("That passage is already bookmarked.");
+            clearSelection();
+            return;
+        }
+        var bm = addBookmark(sel);
+        clearSelection();
+        if (!bm) return;
+        applyHighlights();
+        toast("Bookmarked \u00B7 Chapter " + bm.chapterNumber, "Undo", function () {
+            removeBookmark(bm.id);
+            applyHighlights();
+        });
+    }
+
+    function removeMany(ids) {
+        var removed = [];
+        ids.forEach(function (id) {
+            var r = removeBookmark(id);
+            if (r) removed.push(r);
+        });
+        applyHighlights();
+        if (modalBook) renderModal(modalBook);
+        if (removed.length) {
+            toast("Bookmark removed", "Undo", function () { restoreBookmarks(removed); });
+        }
+    }
+
+    /* ---------- reading the text selection ---------- */
+
+    function clearSelection() {
+        var s = window.getSelection && window.getSelection();
+        if (s && s.removeAllRanges) s.removeAllRanges();
+        lastSel = null;
+        hideFloat();
+    }
+
+    function readSelection() {
+        var s = window.getSelection && window.getSelection();
+        if (!content || !s || !s.rangeCount || s.isCollapsed) return null;
+        var range = s.getRangeAt(0);
+        if (!content.contains(range.startContainer) || !content.contains(range.endContainer)) return null;
+
+        var pre = document.createRange();
+        pre.selectNodeContents(content);
+        pre.setEnd(range.startContainer, range.startOffset);
+        var start = pre.toString().length;
+        var end = start + range.toString().length;
+
+        var full = content.textContent;
+        var raw = full.slice(start, end);
+        start += raw.length - raw.replace(/^\s+/, "").length;     // trim edges
+        end -= raw.length - raw.replace(/\s+$/, "").length;
+        if (end - start > MAX_LEN) end = start + MAX_LEN;
+        if (end - start < 2) return null;
+
+        var st = readerState();
+        var rects = range.getClientRects();
+        return {
+            start: start,
+            end: end,
+            chapterId: st.chapter ? st.chapter.id : null,
+            first: rects.length ? rects[0] : null,
+            last: rects.length ? rects[rects.length - 1] : null
+        };
+    }
+
+    /* ---------- floating bookmark button ---------- */
+
+    var BOOKMARK_PLUS = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/><path d="M12 7v6"/><path d="M9 10h6"/></svg>';
+    var BOOKMARK_MINUS = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/><path d="M9 10h6"/></svg>';
+
+    var floatEl = null, floatMode = null, floatIds = [], floatBusy = false, busyTimer = null;
+
+    function ensureFloat() {
+        if (floatEl) return floatEl;
+        floatEl = document.createElement("button");
+        floatEl.type = "button";
+        floatEl.className = "bm-float";
+
+        function hold(e) {
+            e.preventDefault();               // keep the text selected
+            floatBusy = true;
+            clearTimeout(busyTimer);
+            busyTimer = setTimeout(function () { floatBusy = false; }, 700);
+        }
+        floatEl.addEventListener("mousedown", hold);
+        floatEl.addEventListener("touchstart", hold, { passive: false });
+        floatEl.addEventListener("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            if (floatMode === "add") {
+                var s = readSelection() || recentSelection();
+                if (s) bookmarkSelection(s);
+                else hideFloat();
+            } else if (floatMode === "remove") {
+                var ids = floatIds.slice();
+                hideFloat();
+                removeMany(ids);
+            }
+        });
+        document.body.appendChild(floatEl);
+        return floatEl;
+    }
+
+    function placeFloat(first, last) {
+        var el = ensureFloat();
+        var W = 42;
+        var coarse = isCoarse();
+        var top, left;
+        if (coarse) {
+            top = last.bottom + 34;           // below the selection handles
+            left = last.right - W / 2;
         } else {
-            var bm = addBookmark(line);
-            if (!bm) return;
-            refreshMarks();
-            toast("Bookmarked · Chapter " + bm.chapterNumber, "Undo", function () {
-                removeBookmark(bm.id);
-                refreshMarks();
-            });
+            top = first.top - W - 10;
+            left = first.left + first.width / 2 - W / 2;
+            if (top < 8) top = last.bottom + 10;
+        }
+        top = Math.max(8, Math.min(window.innerHeight - W - 12, top));
+        left = Math.max(8, Math.min(window.innerWidth - W - 8, left));
+        el.style.top = top + "px";
+        el.style.left = left + "px";
+    }
+
+    function showFloat(mode, first, last, ids) {
+        if (!first) return;
+        var el = ensureFloat();
+        floatMode = mode;
+        floatIds = ids || [];
+        el.innerHTML = mode === "remove" ? BOOKMARK_MINUS : BOOKMARK_PLUS;
+        el.setAttribute("aria-label", mode === "remove" ? "Remove bookmark" : "Bookmark selected text");
+        el.title = mode === "remove" ? "Remove bookmark" : "Bookmark selected text";
+        el.classList.toggle("is-remove", mode === "remove");
+        placeFloat(first, last || first);
+        el.classList.add("show");
+    }
+
+    function hideFloat() {
+        floatMode = null;
+        floatIds = [];
+        if (floatEl) floatEl.classList.remove("show");
+    }
+
+    function recentSelection() {
+        var st = readerState();
+        if (!lastSel || !st.chapter || !same(lastSel.chapterId, st.chapter.id)) return null;
+        return Date.now() - lastSel.at < 15000 ? lastSel : null;
+    }
+
+    function onSelectionSettled() {
+        var s = readSelection();
+        if (s) {
+            s.at = Date.now();
+            lastSel = s;
+            showFloat("add", s.first, s.last);
+        } else if (!floatBusy && floatMode === "add") {
+            hideFloat();
         }
     }
 
-    /* ---------- long-press (touch and mouse) ---------- */
-
-    function bindLongPress() {
+    function bindSelection() {
         if (!content) return;
-        var timer = null, startX = 0, startY = 0, pressed = null, fired = false;
-
-        function cancel() {
+        var timer = null;
+        document.addEventListener("selectionchange", function () {
             clearTimeout(timer);
-            timer = null;
-            if (pressed) { pressed.classList.remove("is-pressing"); pressed = null; }
-        }
-
-        content.addEventListener("pointerdown", function (e) {
-            if (e.pointerType === "mouse" && e.button !== 0) return;
-            var line = e.target.closest && e.target.closest(".bm-line");
-            if (!line) return;
-            cancel();
-            fired = false;
-            startX = e.clientX;
-            startY = e.clientY;
-            pressed = line;
-            line.classList.add("is-pressing");
-            timer = setTimeout(function () {
-                fired = true;
-                var target = pressed;
-                cancel();
-                if (navigator.vibrate) { try { navigator.vibrate(14); } catch (err) {} }
-                if (target) toggleLine(target);
-            }, LONG_PRESS_MS);
+            timer = setTimeout(onSelectionSettled, 160);
         });
 
-        content.addEventListener("pointermove", function (e) {
-            if (!timer) return;
-            if (Math.abs(e.clientX - startX) > MOVE_TOLERANCE || Math.abs(e.clientY - startY) > MOVE_TOLERANCE) cancel();
-        });
-
-        ["pointerup", "pointercancel", "pointerleave"].forEach(function (name) {
-            content.addEventListener(name, cancel);
-        });
-
-        content.addEventListener("contextmenu", function (e) {
-            if (fired || (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)) e.preventDefault();
-        });
-
+        /* tap a highlighted passage -> offer to remove it */
         content.addEventListener("click", function (e) {
-            if (fired) { e.preventDefault(); e.stopPropagation(); fired = false; }
-        }, true);
-    }
+            var s = window.getSelection && window.getSelection();
+            if (s && !s.isCollapsed) return;
+            var mk = e.target.closest && e.target.closest("mark.bm-hl");
+            if (!mk) { if (floatMode === "remove") hideFloat(); return; }
+            var ids = (mk.getAttribute("data-bm-ids") || "").split(" ").filter(Boolean);
+            var r = mk.getBoundingClientRect();
+            showFloat("remove", r, r, ids);
+        });
 
-    /* ---------- toolbar: bookmark the line at the top of the screen ---------- */
-
-    function topVisibleLine() {
         var scroller = document.querySelector(".story-reader");
-        var top = scroller ? scroller.getBoundingClientRect().top : 0;
-        var lines = linesIn(content);
-        for (var i = 0; i < lines.length; i++) {
-            var r = lines[i].getBoundingClientRect();
-            if (r.bottom > top + 12) return lines[i];
+        if (scroller) {
+            var ticking = false;
+            scroller.addEventListener("scroll", function () {
+                if (!floatMode || ticking) return;
+                ticking = true;
+                requestAnimationFrame(function () {
+                    ticking = false;
+                    if (floatMode === "add") onSelectionSettled();
+                    else hideFloat();
+                });
+            }, { passive: true });
         }
-        return lines[0] || null;
+        window.addEventListener("resize", hideFloat);
     }
+
+    /* ---------- toolbar icon ---------- */
 
     function bindToolbarButton() {
         var btn = document.getElementById("bookmarkHere");
         if (!btn) return;
+        btn.addEventListener("mousedown", function (e) { e.preventDefault(); });   // keep the selection
         btn.addEventListener("click", function () {
-            var line = topVisibleLine();
-            if (!line) { toast("Open a chapter first."); return; }
-            if (findBookmark(line)) {
-                toast("This line is already bookmarked.");
+            var st = readerState();
+            if (!st.chapter) { toast("Open a chapter first."); return; }
+            var s = readSelection() || recentSelection();
+            if (!s) {
+                toast(isCoarse()
+                    ? "Press and hold a passage to select it, then tap the bookmark icon."
+                    : "Select a passage in the chapter first, then click the bookmark icon.");
                 return;
             }
-            toggleLine(line);
+            bookmarkSelection(s);
         });
     }
 
     /* ---------- first-time hint ---------- */
 
+    var hintQueued = false;
+
     function maybeShowHint() {
-        var coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+        if (hintQueued) return;
         try { if (localStorage.getItem(HINT_KEY)) return; } catch (e) { return; }
+        hintQueued = true;
         setTimeout(function () {
-            toast(coarse ? "Tip: press and hold any line to bookmark it." : "Tip: click and hold any line to bookmark it.");
+            toast("Tip: select any text, then tap the bookmark icon to save it.");
             try { localStorage.setItem(HINT_KEY, "1"); } catch (e) {}
-        }, 1400);
+        }, 1600);
     }
 
-    /* ---------- jump to a saved line ---------- */
+    /* ---------- jump to a saved passage ---------- */
 
-    function lineFor(job) {
-        var lines = linesIn(content);
-        return resolveLine({ line: job.line, text: job.text }, lines);
+    function markFor(job) {
+        if (!content) return null;
+        return content.querySelector('mark.bm-hl[data-bm-ids~="' + job.id + '"]');
     }
 
-    function jumpToLine(job) {
-        var el = lineFor(job);
+    function jumpTo(job) {
+        var el = markFor(job);
         if (!el) return;
-        el.scrollIntoView({ block: "center", behavior: reducedMotion ? "auto" : "instant" });
+        el.scrollIntoView({ block: "center", behavior: "auto" });
         el.classList.remove("bm-flash");
         void el.offsetWidth;
         el.classList.add("bm-flash");
@@ -403,11 +542,11 @@
 
     /* The reader may scroll itself after opening; re-center if we got moved */
     function ensureVisible(job) {
-        var el = lineFor(job);
+        var el = markFor(job);
         if (!el) return;
         var r = el.getBoundingClientRect();
         if (r.bottom < 0 || r.top > window.innerHeight) {
-            el.scrollIntoView({ block: "center", behavior: "instant" });
+            el.scrollIntoView({ block: "center", behavior: "auto" });
         }
     }
 
@@ -415,8 +554,7 @@
         if (!window.SolReader) return;
         pendingJump = {
             chapterId: bm.chapterId,
-            line: bm.line,
-            text: bm.text,
+            id: bm.id,
             expires: Date.now() + 120000
         };
         window.SolReader.closeModal("bookModal");
@@ -432,8 +570,14 @@
         return n;
     }
 
-    var TRASH_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
-    var RIBBON_SVG = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>';
+    var CLOSE_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>';
+    var CHEVRON_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>';
+    var RIBBON_SVG = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>';
+
+    function clip(t, n) {
+        t = norm(t);
+        return t.length > n ? t.slice(0, n).replace(/\s+\S*$/, "") + "\u2026" : t;
+    }
 
     function renderModal(book) {
         modalBook = book || modalBook;
@@ -443,7 +587,7 @@
         if (!listEl || !modalBook) return;
 
         var all = load()
-            .filter(function (b) { return b.bookId === modalBook.id; })
+            .filter(function (b) { return same(b.bookId, modalBook.id); })
             .sort(function (a, b) { return b.created - a.created; });
 
         listEl.innerHTML = "";
@@ -452,7 +596,7 @@
         if (!all.length) {
             var empty = el("li", "bm-empty");
             empty.innerHTML = RIBBON_SVG;
-            empty.appendChild(el("p", "", "Nothing saved yet. While reading, press and hold any line to keep it here."));
+            empty.appendChild(el("p", "", "No bookmarks yet. Select a passage while reading and tap the bookmark icon to keep it here."));
             listEl.appendChild(empty);
             moreBtn.classList.add("hidden");
             return;
@@ -465,22 +609,24 @@
 
             var open = el("button", "bm-open");
             open.type = "button";
-            open.appendChild(el("span", "bm-text", "\u201C" + bm.text + "\u201D"));
             var meta = el("span", "bm-meta");
-            var ch = el("b", "", "Chapter " + bm.chapterNumber);
-            meta.appendChild(ch);
-            meta.appendChild(document.createTextNode("  " + ago(bm.created)));
+            meta.appendChild(el("b", "bm-chip", "Chapter " + bm.chapterNumber));
+            meta.appendChild(el("span", "bm-date", ago(bm.created)));
             open.appendChild(meta);
+            open.appendChild(el("span", "bm-text", clip(bm.text, 170)));
+            var go = el("span", "bm-go");
+            go.innerHTML = CHEVRON_SVG;
+            open.appendChild(go);
             open.addEventListener("click", function () { openBookmark(bm); });
 
             var del = el("button", "bm-remove");
             del.type = "button";
             del.setAttribute("aria-label", "Remove bookmark from chapter " + bm.chapterNumber);
-            del.innerHTML = TRASH_SVG;
+            del.innerHTML = CLOSE_SVG;
             del.addEventListener("click", function () {
                 var removed = removeBookmark(bm.id);
                 renderModal();
-                if (removed) toast("Bookmark removed", "Undo", function () { restoreBookmark(removed); });
+                if (removed) toast("Bookmark removed", "Undo", function () { restoreBookmarks([removed]); });
             });
 
             li.appendChild(open);
@@ -507,19 +653,195 @@
         }
     }
 
+    /* ---------- account sync (Supabase table: bookmarks) ---------- */
+
+    var QUEUE_KEY = "solBookmarks.queue.v1";
+    var OWNER_KEY = "solBookmarks.owner.v1";
+    var TABLE = "bookmarks";
+    var syncing = false, lastSync = 0, warned = false;
+
+    function getUser() { return window.SolReader && window.SolReader.user ? window.SolReader.user() : null; }
+    function getDb() { return window.SolReader && window.SolReader.db ? window.SolReader.db() : null; }
+
+    function loadQueue() {
+        try { var q = JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); return Array.isArray(q) ? q : []; }
+        catch (e) { return []; }
+    }
+    function saveQueue(q) { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(q)); } catch (e) {} }
+    function getOwner() { try { return localStorage.getItem(OWNER_KEY); } catch (e) { return null; } }
+    function setOwner(id) {
+        try { if (id) localStorage.setItem(OWNER_KEY, id); else localStorage.removeItem(OWNER_KEY); } catch (e) {}
+    }
+
+    function enqueue(entry) {
+        var q = loadQueue().filter(function (x) { return x.id !== entry.id; });
+        q.push(entry);
+        saveQueue(q);
+    }
+
+    function toRow(bm, userId) {
+        return {
+            user_id: userId,
+            client_id: bm.id,
+            book_id: String(bm.bookId),
+            chapter_id: String(bm.chapterId),
+            chapter_number: bm.chapterNumber,
+            chapter_title: bm.chapterTitle || "",
+            line: bm.line,
+            text: bm.text,
+            created_at: new Date(bm.created).toISOString()
+        };
+    }
+
+    function fromRow(r) {
+        return {
+            id: r.client_id,
+            bookId: r.book_id,
+            chapterId: r.chapter_id,
+            chapterNumber: r.chapter_number,
+            chapterTitle: r.chapter_title || "",
+            line: r.line,
+            text: r.text,
+            created: Date.parse(r.created_at) || Date.now(),
+            synced: true
+        };
+    }
+
+    function warnOnce(err) {
+        try { console.warn("Bookmark sync failed:", err); } catch (e) {}
+        if (!warned) {
+            warned = true;
+            toast("Saved on this device. Couldn't sync to your account yet.");
+        }
+    }
+
+    async function runOp(entry, user, client) {
+        if (entry.op === "up") {
+            var r = await client.from(TABLE).upsert(toRow(entry.bm, user.id), { onConflict: "user_id,client_id" });
+            return r.error;
+        }
+        var d = await client.from(TABLE).delete().eq("user_id", user.id).eq("client_id", entry.id);
+        return d.error;
+    }
+
+    function markSynced(id) {
+        var list = load();
+        list.forEach(function (b) { if (b.id === id) b.synced = true; });
+        save(list);
+    }
+
+    /* Send one change to the account; if it fails, queue it for the next sync */
+    async function push(entry) {
+        var user = getUser(), client = getDb();
+        if (!user || !client) return;           // guest: stays on device, uploaded at login
+        try {
+            var err = await runOp(entry, user, client);
+            if (err) throw err;
+            if (entry.op === "up") markSynced(entry.id);
+        } catch (e) {
+            enqueue(entry);
+            warnOnce(e);
+        }
+    }
+
+    async function sync(force) {
+        var user = getUser(), client = getDb();
+        if (!user || !client || syncing) return;
+        if (!force && Date.now() - lastSync < 30000) return;
+        syncing = true;
+        try {
+            /* a different account on this device: don't leak the previous reader's bookmarks */
+            var owner = getOwner();
+            if (owner && owner !== user.id) { save([]); saveQueue([]); }
+            setOwner(user.id);
+
+            /* 1. send changes that failed earlier */
+            var left = [];
+            var q = loadQueue();
+            for (var i = 0; i < q.length; i++) {
+                var err = await runOp(q[i], user, client);
+                if (err) left.push(q[i]);
+            }
+            saveQueue(left);
+
+            /* 2. read the account's bookmarks */
+            var res = await client.from(TABLE).select("*").eq("user_id", user.id);
+            if (res.error) throw res.error;
+            var remote = res.data || [];
+
+            var remoteIds = {}, localIds = {}, pendingUp = {}, pendingDel = {};
+            remote.forEach(function (r) { remoteIds[r.client_id] = true; });
+            left.forEach(function (x) { if (x.op === "up") pendingUp[x.id] = true; else pendingDel[x.id] = true; });
+
+            var local = load();
+            var merged = [], toUpload = [];
+            local.forEach(function (b) {
+                localIds[b.id] = true;
+                if (remoteIds[b.id]) { b.synced = true; merged.push(b); }
+                else if (pendingUp[b.id]) { merged.push(b); }
+                else if (!b.synced) { b.synced = true; merged.push(b); toUpload.push(b); }   // saved as guest / never uploaded
+                /* else: was synced before but is gone from the account, deleted on another device */
+            });
+            remote.forEach(function (r) {
+                if (!localIds[r.client_id] && !pendingDel[r.client_id]) merged.push(fromRow(r));
+            });
+
+            /* 3. upload what the account doesn't have yet */
+            if (toUpload.length) {
+                var up = await client.from(TABLE).upsert(
+                    toUpload.map(function (b) { return toRow(b, user.id); }),
+                    { onConflict: "user_id,client_id" }
+                );
+                if (up.error) throw up.error;
+            }
+
+            save(merged);
+            lastSync = Date.now();
+            applyHighlights();
+            if (modalBook) renderModal(modalBook);
+        } catch (e) {
+            warnOnce(e);
+        } finally {
+            syncing = false;
+        }
+    }
+
+    /* called from script.js whenever the login state changes */
+    function onAuth(user) {
+        if (!user) {
+            lastSync = 0;
+            if (getOwner()) {                   // logged out: clear this reader's cached bookmarks
+                save([]); saveQueue([]); setOwner(null);
+                applyHighlights();
+                if (modalBook) renderModal(modalBook);
+            }
+            return;
+        }
+        sync(false);
+    }
+
     /* ---------- init ---------- */
 
     function init() {
         if (content) {
-            observer = new MutationObserver(function () { decorate(); });
+            observer = new MutationObserver(function () { applyHighlights(); });
             observer.observe(content, { childList: true });
-            bindLongPress();
+            bindSelection();
+            applyHighlights();
         }
         bindToolbarButton();
         bindModal();
     }
 
-    window.SolBookmarks = { renderModal: function (book) { showingAll = false; renderModal(book); } };
+    window.SolBookmarks = {
+        renderModal: function (book) { showingAll = false; renderModal(book); sync(false); },
+        onAuth: onAuth,
+        sync: function () { return sync(true); },
+        /* used by js/reader-extras.js (popular highlights -> "Bookmark") */
+        saveRange: function (start, end) {
+            bookmarkSelection({ start: start, end: Math.min(end, start + MAX_LEN) });
+        }
+    };
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
     else init();

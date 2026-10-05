@@ -300,6 +300,8 @@ async function checkUser() {
 
             updateAuthUI();
 
+            if (window.SolBookmarks) window.SolBookmarks.onAuth(currentUser);
+
             if (currentBook) {
                 refreshUnlockedState();
             }
@@ -2479,6 +2481,12 @@ window.SolReader = {
         book: currentBook,
         chapter: currentChapters[currentChapterIndex] || null
     }),
-    open: (bookId, chapterNumber) => openReader(bookId, chapterNumber),
+    user: () => currentUser,
+    db: () => supabaseClient,
+    open: (bookId, chapterNumber) => {
+        /* bookmarks may store the id as text; use the real id from the books list */
+        const match = books.find(item => String(item.id) === String(bookId));
+        return openReader(match ? match.id : bookId, chapterNumber);
+    },
     closeModal: (id) => closeModal(id)
 };
