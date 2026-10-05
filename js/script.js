@@ -745,6 +745,9 @@ async function showBook(bookId) {
 
     resetSynopsis();
 
+    /* Bookmarks panel (js/bookmarks.js) */
+    if (window.SolBookmarks) window.SolBookmarks.renderModal(book);
+
     $("modalBookGenre").textContent = book.genre || "Romance";
 
     /*
@@ -2465,3 +2468,17 @@ function setupReaderExtras() {
         }
     }
 }
+
+/* =========================================================
+   READER BRIDGE (used by js/bookmarks.js)
+   Exposes just what the bookmark feature needs.
+========================================================= */
+
+window.SolReader = {
+    state: () => ({
+        book: currentBook,
+        chapter: currentChapters[currentChapterIndex] || null
+    }),
+    open: (bookId, chapterNumber) => openReader(bookId, chapterNumber),
+    closeModal: (id) => closeModal(id)
+};

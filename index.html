@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/bookmarks.css">
 </head>
 <body>
 
@@ -185,6 +186,16 @@
         <div><strong><svg class="feature-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg><span id="modalBookPrice">₱150</span></strong><span>Full Access</span></div>
         <div><strong><svg class="feature-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11.562 3.266a.5.5 0 0 1 .876 0L15.39 8.87a1 1 0 0 0 1.516.294L21.183 5.5a.5.5 0 0 1 .798.519l-2.834 10.246a1 1 0 0 1-.956.734H5.81a1 1 0 0 1-.957-.734L2.02 6.02a.5.5 0 0 1 .798-.519l4.276 3.664a1 1 0 0 0 1.516-.294z"/><path d="M5 21h14"/></svg><span>∞</span></strong><span>Lifetime Access</span></div>
       </div>
+
+      <!-- Bookmarks saved by this reader for this book (filled by js/bookmarks.js) -->
+      <section id="bookmarksPanel" class="bm-panel" aria-labelledby="bmPanelTitle">
+        <div class="bm-panel-head">
+          <h3 id="bmPanelTitle">Bookmarks</h3>
+          <span id="bmCount" class="bm-count"></span>
+        </div>
+        <ul id="bmList" class="bm-list"></ul>
+        <button id="bmMore" class="bm-more hidden" type="button"></button>
+      </section>
     </div>
 
     <!-- Sticky call to action -->
@@ -206,6 +217,7 @@
   <div class="reader-toolbar">
     <div class="reader-toolbar-inner">
     <button id="toggleSidebar" class="toolbar-btn" type="button" title="Toggle Chapters">☰ Chapters</button>
+    <button id="bookmarkHere" class="toolbar-btn bm-toolbar-btn" type="button" title="Bookmark the line you are reading" aria-label="Bookmark the line you are reading"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>Bookmark</button>
     <div class="toolbar-group">
       <button id="fontDecrease" class="toolbar-btn" type="button" title="Decrease font">A−</button>
       <button id="fontIncrease" class="toolbar-btn" type="button" title="Increase font">A+</button>
@@ -339,5 +351,6 @@
 <script src="js/script.js"></script>
 <script src="js/comments.js"></script>
 <script src="js/reader-theme.js"></script>
+<script src="js/bookmarks.js"></script>
 </body>
 </html>
