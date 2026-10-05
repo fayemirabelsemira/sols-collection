@@ -36,6 +36,10 @@ let pendingChapter = null;
 let viewTimer = null;
 let currentSort = "latest";
 
+/* Chapter unlock state (read-only, for the lock/unlock icons) */
+let fullBookUnlocked = false;
+let unlockedChapterIds = new Set();
+
 /* Default full-book price if a book has no price set */
 const DEFAULT_BOOK_PRICE = 150;
 
@@ -44,6 +48,10 @@ const DEFAULT_BOOK_PRICE = 150;
 ========================================================= */
 
 const $ = (id) => document.getElementById(id);
+
+/* Minimal outline icons (Lucide "eye" and "sun"), 16x16 */
+const ICON_EYE = '<svg class="stat-icon eye" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>';
+const ICON_SUN = '<svg class="stat-icon sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>';
 
 /* Returns the full-book price for a book (falls back to 150) */
 function getBookPrice(book) {
@@ -291,6 +299,10 @@ async function checkUser() {
             currentUser = session?.user || null;
 
             updateAuthUI();
+
+            if (currentBook) {
+                refreshUnlockedState();
+            }
 
             if (currentUser) {
 
@@ -680,8 +692,8 @@ function renderBooks(list = books) {
                 </p>
 
                 <div class="book-stats">
-                    <span>👁 ${views}</span>
-                    <span>☀ ${votes}</span>
+                    <span title="Views">${ICON_EYE}${views}</span>
+                    <span title="Votes">${ICON_SUN}${votes}</span>
                 </div>
 
                 <div class="book-bottom">
@@ -730,6 +742,8 @@ async function showBook(bookId) {
 
     $("modalBookDescription").textContent =
         book.description || "No description available.";
+
+    resetSynopsis();
 
     $("modalBookGenre").textContent = book.genre || "Romance";
 
@@ -789,25 +803,19 @@ async function showBook(bookId) {
 
         statsContainer.className = "modal-stats";
 
-        $("modalBookDescription").after(statsContainer);
+        ($("modalBookAuthor") || $("modalBookDescription")).after(statsContainer);
     }
 
     statsContainer.innerHTML = `
 
-        <span>
-            👁
-            <strong>
-                ${views}
-            </strong>
-            views
+        <span class="modal-stat" title="Views">
+            ${ICON_EYE}
+            <strong>${views}</strong>
         </span>
 
-        <span>
-            ☀
-            <strong id="modalVoteCount">
-                ${votes}
-            </strong>
-            votes
+        <span class="modal-stat" title="Votes">
+            ${ICON_SUN}
+            <strong id="modalVoteCount">${votes}</strong>
         </span>
 
         <button
@@ -816,15 +824,8 @@ async function showBook(bookId) {
             type="button"
             ${alreadyVoted ? "disabled" : ""}
         >
-
-            <span class="sun">
-                ☀
-            </span>
-
-            <span id="voteButtonText">
-                ${alreadyVoted ? "Voted" : "Vote"}
-            </span>
-
+            ${ICON_SUN}
+            <span id="voteButtonText">${alreadyVoted ? "Voted" : "Vote"}</span>
         </button>
     `;
 
@@ -864,6 +865,51 @@ async function showBook(bookId) {
     }
 
     openModal("bookModal");
+
+    refreshSynopsisToggle();
+}
+
+/* =========================================================
+   SYNOPSIS: 3-line clamp + Read More toggle
+========================================================= */
+
+function resetSynopsis() {
+
+    const desc = $("modalBookDescription");
+    const toggle = $("synopsisToggle");
+
+    if (desc) desc.classList.add("clamped");
+
+    if (toggle) {
+        toggle.classList.add("hidden");
+        toggle.textContent = "Read More";
+        toggle.setAttribute("aria-expanded", "false");
+    }
+}
+
+function refreshSynopsisToggle() {
+
+    const desc = $("modalBookDescription");
+    const toggle = $("synopsisToggle");
+
+    if (!desc || !toggle) return;
+
+    /* Wait a frame so the modal is visible and can be measured */
+    requestAnimationFrame(() => {
+
+        const overflowing = desc.scrollHeight > desc.clientHeight + 1;
+
+        toggle.classList.toggle("hidden", !overflowing);
+
+        toggle.onclick = () => {
+
+            const expanded = desc.classList.toggle("clamped") === false;
+
+            toggle.textContent = expanded ? "Show Less" : "Read More";
+
+            toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+        };
+    });
 }
 
 /* =========================================================
@@ -924,13 +970,13 @@ function updateReaderStats(book) {
     const votesEl = $("readerVotes");
 
     if (viewsEl) {
-        viewsEl.textContent =
-            `👁 ${Number(book.views || 2000000).toLocaleString()}`;
+        viewsEl.innerHTML =
+            `${ICON_EYE}<span>${Number(book.views || 2000000).toLocaleString()}</span>`;
     }
 
     if (votesEl) {
-        votesEl.textContent =
-            `☀ ${Number(book.votes || 100000).toLocaleString()}`;
+        votesEl.innerHTML =
+            `${ICON_SUN}<span>${Number(book.votes || 100000).toLocaleString()}</span>`;
     }
 }
 
@@ -1048,7 +1094,9 @@ async function loadChapterList() {
 
             const isFree = chapter.is_free === true;
 
-            const accessLabel = isFree ? "FREE" : "LOCKED";
+            const accessLabel = isFree
+                ? "FREE"
+                : (isChapterMarkedUnlocked(chapter) ? "🔓 UNLOCKED" : "🔒 LOCKED");
 
             /* Hide the title when it only repeats "Chapter N" */
             const rawTitle = (chapter.title || "").trim();
@@ -1070,7 +1118,7 @@ async function loadChapterList() {
                         : `<span class="chapter-title">${escapeHtml(rawTitle)}</span>`
                 }
 
-                <span class="chapter-price ${isFree ? "free" : "paid"}">
+                <span class="chapter-price ${isFree ? "free" : "paid"}${!isFree && isChapterMarkedUnlocked(chapter) ? " unlocked" : ""}">
                     ${accessLabel}
                 </span>
 
@@ -1092,12 +1140,111 @@ async function loadChapterList() {
 
         updateNavigationButtons();
 
+        /* Show 🔓 on chapters this reader has already paid for */
+        refreshUnlockedState();
+
     } catch (error) {
 
         console.error("Chapter list error:", error);
 
         alert("Something went wrong while loading chapters.");
     }
+}
+
+/* =========================================================
+   LOCK / UNLOCK ICONS
+   Frontend display only. Reads the same public.purchases
+   table the app already uses; real access is still decided
+   by the get_chapter_for_reader RPC.
+========================================================= */
+
+function isChapterMarkedUnlocked(chapter) {
+
+    if (!chapter) return false;
+
+    return fullBookUnlocked || unlockedChapterIds.has(chapter.id);
+}
+
+function applyLockBadges() {
+
+    document.querySelectorAll(".chapter-item").forEach((item, index) => {
+
+        const chapter = currentChapters[index];
+
+        if (!chapter) return;
+
+        const isFree =
+            chapter.is_free === true ||
+            chapter.is_free === "true" ||
+            chapter.is_free === 1;
+
+        if (isFree) return;
+
+        const badge = item.querySelector(".chapter-price");
+
+        if (!badge) return;
+
+        const unlocked = isChapterMarkedUnlocked(chapter);
+
+        badge.textContent = unlocked ? "🔓 UNLOCKED" : "🔒 LOCKED";
+
+        badge.classList.toggle("unlocked", unlocked);
+    });
+}
+
+async function refreshUnlockedState() {
+
+    fullBookUnlocked = false;
+    unlockedChapterIds = new Set();
+
+    if (currentUser && currentBook) {
+
+        try {
+
+            const { data, error } = await supabaseClient
+                .from("purchases")
+                .select("chapter_id, book_id, purchase_type")
+                .eq("user_id", currentUser.id)
+                .eq("payment_status", "paid");
+
+            if (error) {
+
+                console.error("Unlock state check failed:", error);
+
+            } else {
+
+                (data || []).forEach(row => {
+
+                    if (
+                        row.purchase_type === "book" &&
+                        row.book_id === currentBook.id
+                    ) {
+                        fullBookUnlocked = true;
+                    } else if (row.chapter_id) {
+                        unlockedChapterIds.add(row.chapter_id);
+                    }
+                });
+            }
+
+        } catch (error) {
+
+            console.error("Unlock state error:", error);
+        }
+    }
+
+    applyLockBadges();
+}
+
+/* Scroll the reader back to the top (used when changing chapter) */
+function scrollReaderToTop() {
+
+    const reader = document.querySelector(".story-reader");
+
+    if (reader) {
+        reader.scrollTop = 0;
+    }
+
+    window.scrollTo(0, 0);
 }
 
 /* =========================================================
@@ -1335,6 +1482,22 @@ async function loadChapterContent(chapter) {
         if (contentElement) {
 
             contentElement.innerHTML = loadedChapter.content || "";
+        }
+
+        /* Always start a new chapter at the top */
+        scrollReaderToTop();
+
+        /* Load the comment section for this chapter (js/comments.js) */
+        if (window.SolComments && currentBook && currentChapters[currentChapterIndex]) {
+            window.SolComments.open(currentBook.id, currentChapters[currentChapterIndex].id);
+        }
+
+        /* The server let us read it, so show it as unlocked */
+        const openedMeta = currentChapters[currentChapterIndex];
+
+        if (openedMeta && !isChapterMarkedUnlocked(openedMeta)) {
+            unlockedChapterIds.add(openedMeta.id);
+            applyLockBadges();
         }
 
         /* =================================================
