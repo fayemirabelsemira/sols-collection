@@ -51,17 +51,15 @@
 
 <!-- BOOKS -->
 <section id="books" class="section books-section">
-  <div class="section-heading">
-    <p class="section-label">FAIR WARNING</p>
-    <h2>Love This Dangerous Should Be Illegal</h2>
-    <p>Read the first 5 chapters free. We dare you to stop at one.</p>
+  <div class="section-heading books-heading">
+    <h2>Author's Work</h2>
   </div>
 
   <div class="books-controls">
-    <div class="search-box">
-      <input type="text" id="bookSearch" placeholder="Search books..." autocomplete="off">
-      <span class="search-icon">⌕</span>
-    </div>
+    <form class="search-box" id="bookSearchForm" role="search" autocomplete="off">
+      <input type="search" id="bookSearch" placeholder="Search stories..." aria-label="Search stories" enterkeyhint="search" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <button class="search-icon" type="submit" aria-label="Search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></button>
+    </form>
     <div class="sort-bar">
       <button class="sort-button active" data-sort="latest" type="button">Latest</button>
       <button class="sort-button" data-sort="popular" type="button">Most Popular</button>

@@ -69,20 +69,6 @@ a{color:inherit;text-decoration:none}
   border:1px solid var(--gold-soft);box-shadow:0 0 0 70px rgba(212,175,55,.04),0 0 0 140px rgba(212,175,55,.025),inset 0 0 90px rgba(0,0,0,.5)}
 .hero::after{content:"";position:absolute;inset:auto 0 0 0;height:140px;background:linear-gradient(transparent,var(--obsidian))}
 .hero-overlay{position:absolute;inset:0;background:radial-gradient(circle,transparent 25%,rgba(0,0,0,.6) 100%)}
-.hero-content{position:relative;z-index:2;width:min(820px,90%)}
-.hero-small{color:var(--gold-hi);font-size:13px;letter-spacing:.35em;margin-bottom:18px;font-weight:500}
-.hero h1{font:700 clamp(46px,9vw,104px)/1 var(--font-display);letter-spacing:.04em;margin-bottom:26px;
-  background:var(--brushed);-webkit-background-clip:text;background-clip:text;color:transparent;
-  filter:drop-shadow(0 6px 24px rgba(0,0,0,.6))}
-.hero-description{max-width:560px;margin:auto;font:italic 400 20px/1.7 var(--font-serif);color:#f1e6d6}
-.hero-description::before{content:"";display:block;width:90px;height:1px;margin:0 auto 24px;background:var(--gold)}
-.hero-buttons{margin-top:38px;display:flex;justify-content:center;gap:14px;flex-wrap:wrap}
-.hero-button{padding:15px 32px;border-radius:999px;font-weight:600;font-size:14px;letter-spacing:.04em;transition:all var(--ease)}
-.hero-button:hover{transform:translateY(-3px)}
-.hero-button.primary{background:var(--brushed);color:#1a1200;border:1px solid var(--gold-hi)}
-.hero-button.primary:hover{box-shadow:0 0 34px rgba(212,175,55,.55)}
-.hero-button.secondary{border:1px solid var(--gold);color:var(--gold-hi);background:rgba(0,0,0,.35)}
-.hero-button.secondary:hover{background:var(--crimson);color:var(--ivory);border-color:var(--gold-hi)}
 
 /* SECTIONS */
 .section{width:min(1200px,92%);margin:auto;padding:100px 0}
@@ -114,7 +100,8 @@ a{color:inherit;text-decoration:none}
 .search-box input{width:100%;padding:13px 46px 13px 20px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--ivory);font-size:14px;outline:none;transition:all var(--ease)}
 .search-box input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,175,55,.15),0 0 24px rgba(139,0,0,.3)}
 .search-box input::placeholder{color:#6f6a62}
-.search-icon{position:absolute;right:18px;top:50%;transform:translateY(-50%);color:var(--gold);font-size:18px;pointer-events:none}
+.search-icon{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;background:transparent;color:var(--gold);cursor:pointer}
+.search-icon:hover{color:var(--gold-hi)}
 .sort-bar{display:flex;gap:8px;flex-wrap:wrap}
 .sort-button{padding:10px 20px;border:1px solid var(--border);background:var(--surface);color:var(--muted);border-radius:999px;font-size:13px;font-weight:500;transition:all var(--ease)}
 .sort-button:hover{border-color:var(--gold);color:var(--gold-hi)}
@@ -152,7 +139,8 @@ a{color:inherit;text-decoration:none}
 .genre-card{padding:28px 20px;background:var(--surface);color:var(--ivory);border:1px solid var(--border);border-radius:var(--radius);font:600 17px var(--font-display);letter-spacing:.08em;position:relative;overflow:hidden;transition:all var(--ease)}
 .genre-card::before{content:"";position:absolute;inset:0;background:var(--crimson-grad);opacity:0;transition:opacity var(--ease)}
 .genre-card{z-index:0}.genre-card:hover{border-color:var(--gold);color:var(--gold-hi);transform:translateY(-4px);box-shadow:0 12px 34px rgba(139,0,0,.45)}
-.genre-card:hover::before{opacity:1;z-index:-1}
+.genre-card:hover::before,.genre-card.active::before{opacity:1;z-index:-1}
+.genre-card.active{border-color:var(--gold);color:var(--gold-hi)}
 
 /* MODALS */
 .modal{position:fixed;inset:0;z-index:2000;display:none;align-items:center;justify-content:center;padding:20px}
@@ -278,14 +266,7 @@ a{color:inherit;text-decoration:none}
   .reader-layout{grid-template-columns:230px 1fr}
 }
 @media(max-width:700px){
-  .header-inner,.mobile-menu{min-height:70px}.mobile-menu{top:70px}
   .logo-symbol{width:40px;height:40px;font-size:20px}.logo-name{font-size:15px}.logo-tagline{display:none}
-  .hero{min-height:620px}.hero::before{width:380px;height:380px}
-  .section{padding:70px 0}
-  .continue-card{grid-template-columns:1fr}.continue-cover{min-height:200px;border-right:none;border-bottom:1px solid var(--border)}
-  .continue-information{padding:28px}
-  .books-controls{flex-direction:column;align-items:stretch}.search-box{max-width:100%}.sort-bar{justify-content:center}
-  .books-grid{grid-template-columns:1fr}.genres-grid{grid-template-columns:1fr 1fr}
   .book-modal-box{grid-template-columns:1fr;overflow-y:auto}
   .modal-book-cover{min-height:260px;height:260px;border-right:none;border-bottom:1px solid var(--border)}
   .modal-book-information{padding:28px 22px 34px}.modal-book-information h2{font-size:26px}
@@ -296,7 +277,6 @@ a{color:inherit;text-decoration:none}
   .reader-topbar{padding:0 14px}.reader-book-title{max-width:150px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:14px}
 }
 @media(max-width:450px){
-  .hero-description{font-size:17px}.genres-grid{grid-template-columns:1fr}
   .reader-navigation{flex-direction:column}.reader-nav-button{width:100%}
 }
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}html{scroll-behavior:auto}}
@@ -352,11 +332,6 @@ a{color:inherit;text-decoration:none}
 
 .hero-inner{position:relative;z-index:2;width:min(1240px,94%);margin:0 auto;
   display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:48px;align-items:center}
-.hero-content{width:auto;margin:0;text-align:center;min-width:0}
-.hero h1{font-size:clamp(30px,3.9vw,54px);letter-spacing:.02em;padding:0 .06em;margin-bottom:8px}
-.hero-small{font-size:12px}
-.hero-content .hero-buttons{margin-top:26px;gap:10px}
-.hero-button{padding:13px 24px}
 
 #about.about-card{grid-template-columns:200px 1fr;max-width:none;margin:0;scroll-margin-top:100px;
   background:linear-gradient(165deg,rgba(27,27,27,.92),rgba(13,13,13,.94));backdrop-filter:blur(8px)}
@@ -379,7 +354,7 @@ a{color:inherit;text-decoration:none}
   .hero{min-height:0;padding:56px 0 64px}
   .hero::before{left:50%;top:150px;width:380px;height:380px}
   .hero-inner{grid-template-columns:1fr;gap:40px}
-  .hero h1{font-size:clamp(34px,9vw,64px)}
+  
 }
 @media(max-width:700px){
   #about.about-card{grid-template-columns:1fr}
@@ -400,20 +375,8 @@ a{color:inherit;text-decoration:none}
 
 /* Hero title: two stacked lines, ring locked to the title block */
 .hero::before{display:none}
-.hero-content{position:relative;isolation:isolate}
-.hero-content::before{content:"";position:absolute;z-index:-1;top:50%;left:50%;width:min(540px,125%);aspect-ratio:1;
-  transform:translate(-50%,-50%);border-radius:50%;border:1px solid var(--gold-soft);
-  box-shadow:0 0 0 50px rgba(212,175,55,.035),inset 0 0 80px rgba(0,0,0,.45)}
-.hero h1{width:min-content;margin:0 auto 6px;line-height:1.02;font-size:clamp(32px,4.2vw,60px)}
-.hero-small{color:var(--gold-hi);font-size:12px;letter-spacing:.32em}
 
 /* CTA hierarchy: solid primary, quiet ghost secondary */
-.hero-content .hero-buttons{margin-top:30px;gap:12px;align-items:center}
-.hero-button.primary{background:var(--gold-hi);color:#140d00;font-weight:700;font-size:15px;padding:15px 32px;border:1px solid var(--gold-hi);
-  box-shadow:0 8px 28px rgba(229,193,88,.35)}
-.hero-button.primary:hover{background:#f2d572;box-shadow:0 10px 36px rgba(229,193,88,.55)}
-.hero-button.secondary{background:transparent;color:var(--ivory);font-weight:500;font-size:14px;padding:14px 24px;border:1px solid rgba(245,245,247,.4)}
-.hero-button.secondary:hover{background:rgba(245,245,247,.08);border-color:var(--ivory);color:#fff}
 
 /* About card: more breathing room */
 #about .about-profile{padding:38px 22px}
@@ -442,11 +405,6 @@ a{color:inherit;text-decoration:none}
 .logo-tagline,.book-author,.chapter-count,.book-stats,.progress-information,.continue-information p{color:var(--muted)}
 .book-description{color:#d6d1c8}
 
-@media(max-width:1000px){.hero h1{font-size:clamp(34px,9vw,64px)}}
-@media(max-width:700px){
-  #about .about-body{padding:28px 22px 30px}
-  #about .about-profile{padding:30px 20px}
-}
 /* ===== HEADER LOGO: photo ===== */
 .logo-symbol img{object-fit:cover;object-position:55% 33%;padding:0}
 /* ===== READER PAGE THEMES (White / Beige / Black) ===== */
@@ -499,11 +457,6 @@ main>.books-section:first-child{padding-top:60px}
 .progress-container{height:4px;margin:11px 0 4px}
 .progress-information{font-size:10px;margin-bottom:11px}
 .continue-card .read-button{padding:6px 12px;font-size:11px}
-@media(max-width:760px){
-  .continue-card{grid-template-columns:90px 1fr;max-width:340px}
-  .continue-cover{min-height:120px;border-right:1px solid var(--border);border-bottom:none}
-  .continue-information{padding:14px}
-}
 
 /* ===== Author section only (welcome text + buttons removed) ===== */
 .hero{min-height:0;padding:90px 0}
@@ -558,42 +511,9 @@ main>.books-section:first-child{padding-top:60px}
 .chapter-price{white-space:nowrap;display:inline-flex;align-items:center;gap:4px}
 .chapter-price.paid.unlocked{color:var(--gold-hi);border-color:var(--gold-soft);background:rgba(212,175,55,.1)}
 
-/* =========================================================
-   MOBILE: compact horizontal book cards
-========================================================= */
-@media(max-width:700px){
-  .books-grid{grid-template-columns:1fr;gap:12px}
-  .book-card{display:grid;grid-template-columns:92px minmax(0,1fr);align-items:stretch;box-shadow:0 6px 18px rgba(0,0,0,.4)}
-  .book-card:hover{transform:none}
-  .book-cover{height:auto;min-height:132px;border-bottom:none;border-right:1px solid var(--border)}
-  .book-cover::after{background:none}
-  .book-cover img{position:absolute;inset:0}
-  .book-cover>span,.cover-fallback span{width:52px;height:52px;font-size:20px;box-shadow:0 0 20px rgba(212,175,55,.2)}
-  .book-information{padding:10px 12px;display:flex;flex-direction:column;min-width:0}
-  .book-category{font-size:9px;letter-spacing:.14em}
-  .book-information h3{font-size:16px;line-height:1.2;margin:2px 0}
-  .book-author{font-size:11px;margin-bottom:4px}
-  .book-description{font-size:12px;line-height:1.45;-webkit-line-clamp:2;margin-bottom:6px}
-  .book-stats{font-size:11px;gap:10px;margin:0 0 6px}
-  .book-bottom{padding-top:8px;margin-top:auto}
-  .chapter-count{font-size:11px}
-  .book-bottom .read-button{padding:5px 12px;font-size:11px}
-}
-
-/* =========================================================
-   MOBILE: compact 2-column genres
-========================================================= */
-@media(max-width:700px){
-  .genres-section{padding-top:20px;padding-bottom:40px}
-  .genres-grid{grid-template-columns:repeat(2,1fr);gap:10px}
-  .genre-card{padding:12px 8px;font-size:12px;letter-spacing:.05em;border-radius:12px}
-  .genre-card:hover{transform:none}
-}
-
 /* Navbar: text-only brand, aligned left */
 .logo{gap:0;justify-content:flex-start}
 .logo-text{align-items:flex-start;text-align:left}
-
 
 /* =========================================================
    VIEW / VOTE ICONS (vector eye + sun, 16x16)
@@ -667,7 +587,6 @@ main>.books-section:first-child{padding-top:60px}
 .book-modal-box .book-features strong{display:flex;align-items:center;justify-content:center;gap:6px}
 .book-modal-box .book-features strong>span{display:inline;margin:0;font:inherit;color:inherit}
 .feature-icon{width:16px;height:16px;flex:0 0 16px;color:#D4AF37}
-
 
 /* =========================================================
    COMMENTS (follows the reader page theme)
@@ -1022,3 +941,122 @@ button.cx-rel{cursor:pointer}button.cx-rel:hover{border-color:rgba(212,175,55,.5
 .tl-share:hover{color:#fff;background:rgba(139,0,0,.4)}
 @media (max-width:420px){.cx-grid{grid-template-columns:repeat(2,1fr)}.cx-lg{width:88px;height:88px}.cx-title{font-size:26px}}
 @media (prefers-reduced-motion:reduce){.cx-sheet,.rc-card,.cx-backdrop,.rc-backdrop,.pl-pop{transition:none}}
+
+/* =========================================================
+   HOME PAGE — RESPONSIVE LAYER
+   One place for the phone layout. Desktop/tablet rules above
+   stay as they were; everything below only changes ≤700px.
+   (Tuned at 320 / 375 / 390 / 414 / 430px.)
+========================================================= */
+:root{--header-h:82px;--gutter:14px}
+html{-webkit-text-size-adjust:100%}
+body{overflow-x:clip}               /* safety net only — nothing should overflow */
+
+/* "Author's Work" heading (all sizes) */
+.books-heading{margin-bottom:28px}
+.books-heading h2{font-size:clamp(22px,3vw,32px);letter-spacing:.16em;text-transform:uppercase;margin-bottom:0}
+.books-heading h2::after{content:"";display:block;width:56px;height:1px;margin:12px auto 0;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent)}
+.search-box input[type="search"]{-webkit-appearance:none;appearance:none}
+.book-information h3,.book-description{overflow-wrap:anywhere}
+
+@media(max-width:700px){
+  :root{--header-h:58px}
+
+  /* ---- header + menu ---- */
+  .header-inner{width:100%;padding:0 var(--gutter);min-height:var(--header-h);gap:12px}
+  .logo{min-width:0}
+  .logo-name{font-size:15px;white-space:nowrap}
+  .mobile-menu-button{flex:0 0 auto;width:40px;height:40px;font-size:20px}
+  .mobile-menu{top:var(--header-h);padding:8px var(--gutter) 12px;
+    max-height:calc(100vh - var(--header-h));max-height:calc(100dvh - var(--header-h));overflow-y:auto;
+    background:var(--obsidian);
+    box-shadow:0 0 0 100vmax rgba(0,0,0,.6)}              /* dims the page behind the open menu */
+  .mobile-menu a,.mobile-menu button{padding:12px;font-size:15px}
+
+  /* ---- section rhythm ---- */
+  .section{width:calc(100% - 2*var(--gutter));padding:24px 0}
+  main>.books-section:first-child{padding-top:16px}
+  .section-heading{margin-bottom:12px}
+  .section-heading h2{font-size:22px;margin-bottom:0}
+  .section-label{font-size:10px;letter-spacing:.18em;margin-bottom:4px;gap:10px}
+  .section-label::before,.section-label::after{width:22px}
+  .books-heading{margin-bottom:12px}
+  .books-heading h2{font-size:20px;letter-spacing:.14em}
+  .books-heading h2::after{width:44px;margin-top:8px}
+
+  /* ---- search + sort ---- */
+  .books-controls{flex-direction:column;align-items:center;gap:10px;margin-bottom:14px}
+  .search-box{flex:none;width:min(100%,340px);min-width:0;max-width:340px}
+  .search-box input{height:44px;padding:0 44px 0 16px;font-size:16px}   /* 16px stops iOS zooming on focus */
+  .search-box input::placeholder{font-size:14px}
+  .search-icon{right:5px;width:36px;height:36px}
+  .sort-bar{display:flex;flex-wrap:nowrap;justify-content:center;gap:6px;width:100%}
+  .sort-button{flex:0 1 auto;min-width:0;height:40px;padding:0 14px;font-size:13px;border-radius:10px;white-space:nowrap}
+
+  /* ---- book cards: vertical ---- */
+  .books-grid{grid-template-columns:minmax(0,1fr);gap:14px}
+  .book-card{display:flex;flex-direction:column;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+  .book-card:hover{transform:none}
+  .book-cover{width:min(150px,44vw);height:auto;aspect-ratio:2/3;margin:14px auto 0;
+    border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 20px rgba(0,0,0,.5)}
+  .book-cover::after{display:none}
+  .book-cover img{position:absolute;inset:0}
+  .book-cover>span,.cover-fallback span{width:56px;height:56px;font-size:22px;box-shadow:0 0 20px rgba(212,175,55,.2)}
+  .book-information{display:flex;flex-direction:column;min-width:0;padding:12px 14px 14px}
+  .book-category{font-size:10px;letter-spacing:.16em}
+  .book-information h3{font-size:18px;line-height:1.25;margin:3px 0 2px}
+  .book-author{font-size:12px;margin-bottom:6px}
+  .book-description{font-size:13px;line-height:1.5;margin-bottom:10px}
+  .book-stats{gap:14px;margin:0 0 8px;font-size:12px}
+  .book-bottom{flex-direction:column;align-items:stretch;gap:8px;padding-top:10px}
+  .chapter-count{font-size:12px}
+  .book-bottom .read-button{width:100%;height:40px;padding:0 16px;border-radius:10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+  .loading-message,.empty-message{padding:24px 12px}
+
+  /* ---- continue reading ---- */
+  .continue-section{padding:12px 0}
+  .continue-section .section-heading{margin-bottom:10px}
+  .continue-card{grid-template-columns:72px minmax(0,1fr);max-width:none}
+  .continue-cover{min-height:100px;font-size:18px;border-right:1px solid var(--border);border-bottom:none}
+  .continue-information{min-width:0;padding:10px 12px}
+  .continue-information h3{font-size:14px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+  .continue-card .read-button{height:32px;padding:0 14px;font-size:11px}
+
+  /* ---- genres: compact 2-column ---- */
+  .genres-section{padding:10px 0 24px}
+  .genres-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .genre-card{display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 8px;
+    border-radius:10px;font-size:13px;letter-spacing:.05em;text-align:center}
+  .genre-card:hover{transform:none}
+
+  /* ---- author profile ---- */
+  .hero{padding:8px 0 28px}
+  .hero-inner{width:calc(100% - 2*var(--gutter))}
+  #about.about-card{scroll-margin-top:calc(var(--header-h) + 8px);border-radius:14px}
+  #about .about-profile{padding:16px 14px}
+  #about .about-avatar{width:80px;height:80px;margin-bottom:8px}
+  #about .about-name{font-size:18px}
+  #about .about-handle{margin-bottom:8px;font-size:12px}
+  #about .about-role{padding:5px 12px;font-size:11px}
+  #about .about-body{padding:16px 16px 18px}
+  #about .about-body h2{margin-bottom:10px;font-size:22px}
+  #about .about-alias{font-size:.55em}
+  #about .about-quote{margin-bottom:12px;padding-left:12px;font-size:15px;line-height:1.5}
+  #about .about-body p{margin-bottom:8px;font-size:13px;line-height:1.6}
+  #about .about-body .about-welcome{font-size:15px}
+  #about .skill-badges{gap:6px;margin-top:12px;padding-top:12px}
+  #about .skill-badges li{padding:5px 10px;font-size:11px}
+
+  .site-footer{padding:32px var(--gutter)}
+  .footer-logo{font-size:20px}
+}
+
+/* very small phones (320px class) */
+@media(max-width:359px){
+  :root{--gutter:12px}
+  .logo-name{font-size:14px;letter-spacing:.04em}
+  .sort-button{padding:0 9px;font-size:12px}
+  .genre-card{font-size:12px;letter-spacing:.03em}
+  .book-cover{width:min(140px,46vw)}
+}

@@ -35,6 +35,16 @@ let currentUser = null;
 let pendingChapter = null;
 let viewTimer = null;
 let currentSort = "latest";
+let currentQuery = "";
+let currentGenre = "";
+
+/* Reading position (Continue Reading) */
+let continueState = null;          // what the Continue Reading card currently shows
+let pendingRestore = null;         // position to jump to once the chapter text is on screen
+let positionSaveTimer = null;
+let positionBurstStart = 0;
+let positionColumns = true;        // flips to false if the DB hasn't got the new columns yet
+let progressQueue = Promise.resolve();
 
 /* Chapter unlock state (read-only, for the lock/unlock icons) */
 let fullBookUnlocked = false;
@@ -81,6 +91,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupReaderExtras();
     setupGenreButtons();
     setupSortButtons();
+    setupBookSearch();
+    setupReadingPositionTracking();
 
     await checkUser();
     await loadBooks();
@@ -306,14 +318,7 @@ async function checkUser() {
                 refreshUnlockedState();
             }
 
-            if (currentUser) {
-
-                await loadContinueReading();
-
-            } else {
-
-                updateContinueDisplay(1, books[0] || null);
-            }
+            await loadContinueReading();
         }
     );
 }
@@ -462,6 +467,8 @@ async function signup(event) {
             password,
 
             options: {
+                /* confirmation email sends people back to THIS site, not Supabase's default URL */
+                emailRedirectTo: window.location.origin,
                 data: {
                     display_name: name
                 }
@@ -632,7 +639,36 @@ function applySort(type) {
         );
     }
 
-    renderBooks(sorted);
+    // Search + genre filters stack on top of whichever sort is active,
+    // so views/votes updates never wipe out what the reader is looking at.
+    renderBooks(sorted.filter(matchesFilters));
+}
+
+/* True when a book passes the current genre filter AND search query */
+function matchesFilters(book) {
+
+    if (currentGenre) {
+        const bookGenre = (book.genre || "").toLowerCase();
+        if (!bookGenre.includes(currentGenre.toLowerCase())) return false;
+    }
+
+    if (currentQuery) {
+        const haystack = [
+            book.title,
+            book.author,
+            book.genre,
+            book.description
+        ].join(" ").toLowerCase();
+
+        // every word typed must appear somewhere ("dark romance", "ladyysol love")
+        return currentQuery
+            .toLowerCase()
+            .split(/\s+/)
+            .filter(Boolean)
+            .every(word => haystack.includes(word));
+    }
+
+    return true;
 }
 
 function renderBooks(list = books) {
@@ -642,6 +678,18 @@ function renderBooks(list = books) {
     if (!booksGrid) return;
 
     booksGrid.innerHTML = "";
+
+    if (!list.length) {
+
+        const message = (currentGenre && !currentQuery)
+            ? `No ${escapeHtml(currentGenre)} stories found yet.`
+            : "No stories found.";
+
+        booksGrid.innerHTML =
+            `<div class="empty-message">${message}</div>`;
+
+        return;
+    }
 
     list.forEach(book => {
 
@@ -986,6 +1034,8 @@ function updateReaderStats(book) {
 }
 
 function closeReader() {
+
+    flushReadingPosition();
 
     if (viewTimer) {
 
@@ -1387,6 +1437,56 @@ async function isChapterUnlocked(chapterId) {
 }
 
 /* =========================================================
+   CHAPTER TEXT FORMATTING
+   "quoted text"  or  “quoted text”  ->  bold
+   *text*                            ->  italics
+   Works on text only (never touches HTML tags), and the same
+   function is used for the reader AND the "Continue Reading"
+   preview so text positions always match.
+========================================================= */
+
+function formatChapterContent(html) {
+
+    if (!html) return "";
+
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    const walker = document.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    let n;
+
+    while ((n = walker.nextNode())) textNodes.push(n);
+
+    textNodes.forEach((node) => {
+
+        const text = node.nodeValue;
+
+        if (!text || (text.indexOf("*") === -1 && !/["\u201C]/.test(text))) return;
+
+        /* Skip text inside code / scripts */
+        const parent = node.parentElement;
+        if (parent && /^(SCRIPT|STYLE|CODE|PRE)$/i.test(parent.tagName)) return;
+
+        let out = text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+
+        /* *italics* */
+        out = out.replace(/\*([^*\n]+?)\*/g, "<em>$1</em>");
+
+        /* "bold"  and  “bold” (quote marks stay visible) */
+        out = out.replace(/(\u201C[^\u201D]*\u201D|"[^"]*")/g, "<strong>$1</strong>");
+
+        const tpl = document.createElement("template");
+        tpl.innerHTML = out;
+        node.replaceWith(tpl.content);
+    });
+
+    return doc.body.innerHTML;
+}
+
+/* =========================================================
    LOAD CHAPTER CONTENT
    Uses secure SECURITY DEFINER RPC.
 ========================================================= */
@@ -1486,11 +1586,14 @@ async function loadChapterContent(chapter) {
 
         if (contentElement) {
 
-            contentElement.innerHTML = loadedChapter.content || "";
+            contentElement.innerHTML = formatChapterContent(loadedChapter.content || "");
         }
 
         /* Always start a new chapter at the top */
         scrollReaderToTop();
+
+        /* ...unless the reader came back via Continue Reading */
+        applyPendingRestore(loadedChapter);
 
         /* Load the comment section for this chapter (js/comments.js) */
         if (window.SolComments && currentBook && currentChapters[currentChapterIndex]) {
@@ -1580,7 +1683,7 @@ function renderChapter(chapter) {
     const contentElement = $("readerContent") || $("storyContent");
 
     if (contentElement) {
-        contentElement.innerHTML = chapter.content || "";
+        contentElement.innerHTML = formatChapterContent(chapter.content || "");
     }
 
     updateReaderProgress(chapter.chapter_number);
@@ -1644,191 +1747,599 @@ function updateReaderProgress(chapterNumber) {
    READING PROGRESS
 ========================================================= */
 
-async function saveReadingProgress(chapter) {
+/* ---------- helpers: reading the chapter text ---------- */
 
-    if (!currentUser || !currentBook || !chapter) {
+const EXCERPT_MIN = 90;     // very short paragraphs ("Hello.") are joined with the next one
+const EXCERPT_MAX = 260;    // preview is cut at a word boundary and ends with "..."
+const BLOCK_TAGS = /^(P|DIV|LI|BLOCKQUOTE|H[1-6]|SECTION|ARTICLE|UL|OL|PRE)$/;
 
-        if (chapter) {
-            updateContinueDisplay(chapter.chapter_number);
+function sameId(a, b) {
+    return a !== null && a !== undefined && b !== null && b !== undefined &&
+        String(a) === String(b);
+}
+
+/* Flattens a chapter into one string and remembers which text node each
+   character belongs to. Block edges / <br> count as paragraph breaks, so it
+   works for plain text (blank-line paragraphs) and for <p> markup alike. */
+function buildTextIndex(root) {
+
+    const nodes = [];
+    let full = "";
+    let lastBlock = null;
+
+    const blockOf = (node) => {
+        let el = node.parentElement;
+        while (el && el !== root && !BLOCK_TAGS.test(el.tagName)) el = el.parentElement;
+        return el || root;
+    };
+
+    const walker = document.createTreeWalker(
+        root, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT
+    );
+
+    let node;
+
+    while ((node = walker.nextNode())) {
+
+        if (node.nodeType === 1) {
+            if (node.tagName === "BR") full += "\n";
+            continue;
         }
 
-        return;
+        const text = node.nodeValue;
+        if (!text) continue;
+
+        const block = blockOf(node);
+
+        if (lastBlock && block !== lastBlock && !full.endsWith("\n")) full += "\n";
+
+        lastBlock = block;
+        nodes.push({ node, start: full.length, len: text.length });
+        full += text;
     }
 
-    const total = Number(currentBook.total_chapters || 49);
+    return { full, nodes };
+}
 
-    const chapterNumber = Number(chapter.chapter_number);
+function nodeAtOffset(index, offset) {
 
-    const percent = Math.round((chapterNumber / total) * 100);
+    return index.nodes.find(n => offset >= n.start && offset < n.start + n.len) ||
+        index.nodes[index.nodes.length - 1] || null;
+}
+
+/* The paragraph containing `offset`, trimmed to a short readable excerpt */
+function excerptAt(full, offset) {
+
+    const paragraphs = [];
+    const re = /[^\n]+/g;
+    let m;
+
+    while ((m = re.exec(full))) {
+
+        const text = m[0].replace(/\s+/g, " ").trim();
+
+        if (text && /[\p{L}\p{N}]/u.test(text)) {
+            paragraphs.push({ end: m.index + m[0].length, text });
+        }
+    }
+
+    if (!paragraphs.length) return "";
+
+    let i = paragraphs.findIndex(p => offset < p.end);
+    if (i < 0) i = paragraphs.length - 1;
+
+    let text = paragraphs[i].text;
+
+    while (text.length < EXCERPT_MIN && i < paragraphs.length - 1) {
+        i++;
+        text += " " + paragraphs[i].text;
+    }
+
+    if (text.length > EXCERPT_MAX) {
+        text = text.slice(0, EXCERPT_MAX).replace(/\s+\S*$/, "") + "...";
+    }
+
+    return text;
+}
+
+function offsetAtPoint(index, x, y) {
+
+    for (const dy of [0, 14, 28, 42]) {
+
+        let node = null;
+        let off = 0;
+
+        if (document.caretPositionFromPoint) {
+            const p = document.caretPositionFromPoint(x, y + dy);
+            if (p) { node = p.offsetNode; off = p.offset; }
+        } else if (document.caretRangeFromPoint) {
+            const r = document.caretRangeFromPoint(x, y + dy);
+            if (r) { node = r.startContainer; off = r.startOffset; }
+        }
+
+        const entry = node && index.nodes.find(n => n.node === node);
+
+        if (entry) return entry.start + Math.min(off, entry.len);
+    }
+
+    return null;
+}
+
+/* ---------- capture / restore the reader's position ---------- */
+
+/* Where is the reader right now?  { offset, ratio, excerpt } or null */
+function captureReadingPosition() {
+
+    const reader = $("readerSection");
+    const scroller = document.querySelector(".story-reader");
+    const content = $("storyContent");
+
+    if (!reader || !scroller || !content || reader.classList.contains("hidden")) return null;
+
+    const sr = scroller.getBoundingClientRect();
+
+    if (!sr.height) return null;
+
+    const index = buildTextIndex(content);
+
+    if (!index.full.trim()) return null;
+
+    const max = scroller.scrollHeight - scroller.clientHeight;
+    const ratio = max > 0 ? Math.min(1, Math.max(0, scroller.scrollTop / max)) : 0;
+
+    let offset = 0;
+
+    const probeY = sr.top + Math.min(90, sr.height * 0.2);
+    const cr = content.getBoundingClientRect();
+
+    /* still on the chapter heading / first lines? then they are at the start */
+    if (scroller.scrollTop > 4 && cr.top < probeY) {
+
+        const x = Math.min(cr.right - 4, Math.max(cr.left + 4, sr.left + sr.width / 2));
+
+        const hit = offsetAtPoint(index, x, probeY);
+
+        offset = hit !== null ? hit : Math.round(ratio * index.full.length);
+    }
+
+    return { offset, ratio, excerpt: excerptAt(index.full, offset) };
+}
+
+/* Scroll the reader so the saved paragraph sits where it was when they stopped */
+function restoreReadingPosition(target) {
+
+    const scroller = document.querySelector(".story-reader");
+    const content = $("storyContent");
+
+    if (!scroller || !content) return;
+
+    const index = buildTextIndex(content);
+
+    const max = scroller.scrollHeight - scroller.clientHeight;
+    let top = null;
+
+    const sr = scroller.getBoundingClientRect();
+    const probe = Math.min(90, sr.height * 0.2);
+
+    if (target.offset > 0 && target.offset < index.full.length) {
+
+        const entry = nodeAtOffset(index, target.offset);
+
+        if (entry) {
+
+            const range = document.createRange();
+            const at = Math.min(target.offset - entry.start, entry.len - 1);
+
+            range.setStart(entry.node, Math.max(0, at));
+            range.setEnd(entry.node, Math.max(0, at) + 1);
+
+            const rect = range.getBoundingClientRect();
+
+            if (rect.height) top = scroller.scrollTop + (rect.top - sr.top) - probe;
+        }
+    }
+
+    if (top === null && target.ratio > 0 && max > 0) top = target.ratio * max;
+
+    if (top === null) return;
+
+    top = Math.max(0, Math.round(top));
+
+    scroller.scrollTop = top;
+
+    /* fonts / highlights can nudge the layout a moment later: re-apply once if untouched */
+    if (!target.__again) {
+        setTimeout(() => {
+            if (Math.abs(scroller.scrollTop - top) < 3) {
+                restoreReadingPosition({ ...target, __again: true });
+            }
+        }, 350);
+    }
+}
+
+function applyPendingRestore(chapter) {
+
+    const target = pendingRestore;
+
+    if (!target || !chapter) return;
+
+    const matches =
+        sameId(target.bookId, currentBook?.id) &&
+        (sameId(target.chapterId, chapter.id) ||
+            Number(target.chapterNumber) === Number(chapter.chapter_number));
+
+    if (!matches) return;
+
+    pendingRestore = null;
+
+    restoreReadingPosition(target);
+}
+
+/* ---------- saving ---------- */
+
+function localPositionKey() {
+    return "solReadPos.v1:" + (currentUser ? currentUser.id : "guest");
+}
+
+function readLocalPositions() {
+    try {
+        const all = JSON.parse(localStorage.getItem(localPositionKey()) || "{}");
+        return all && typeof all === "object" ? all : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function writeLocalPosition(state) {
+
+    const all = readLocalPositions();
+
+    all[String(state.bookId)] = state;
+
+    const newest = Object.entries(all)
+        .sort((a, b) => (b[1].ts || 0) - (a[1].ts || 0))
+        .slice(0, 20);
 
     try {
+        localStorage.setItem(localPositionKey(), JSON.stringify(Object.fromEntries(newest)));
+    } catch (e) { /* storage full / blocked: the database copy still works */ }
+}
 
-        const { error } = await supabaseClient
-            .from("reading_progress")
-            .upsert(
-                {
-                    user_id: currentUser.id,
-                    book_id: currentBook.id,
-                    chapter_id: chapter.id,
-                    chapter_number: chapterNumber,
-                    progress_percent: percent,
-                    updated_at: new Date().toISOString()
-                },
-                {
-                    onConflict: "user_id,book_id"
-                }
-            );
+function latestLocalPosition() {
 
-        if (error) {
+    return Object.values(readLocalPositions())
+        .filter(p => p && books.some(b => sameId(b.id, p.bookId)))
+        .sort((a, b) => (b.ts || 0) - (a.ts || 0))[0] || null;
+}
 
-            console.error("Progress save error:", error);
+function isMissingColumnError(error) {
+    return !!error && (
+        error.code === "PGRST204" ||
+        error.code === "42703" ||
+        /read_offset|scroll_ratio|last_excerpt/i.test(error.message || "")
+    );
+}
+
+/* One row per user+book in the EXISTING reading_progress table */
+function upsertProgress(userId, state) {
+
+    progressQueue = progressQueue.then(async () => {
+
+        const base = {
+            user_id: userId,
+            book_id: state.bookId,
+            chapter_id: state.chapterId,
+            chapter_number: state.chapterNumber,
+            progress_percent: state.percent,
+            updated_at: new Date(state.ts).toISOString()
+        };
+
+        const extra = {
+            read_offset: state.offset,
+            scroll_ratio: state.ratio,
+            last_excerpt: state.excerpt || null
+        };
+
+        const options = { onConflict: "user_id,book_id" };
+
+        try {
+
+            let { error } = await supabaseClient
+                .from("reading_progress")
+                .upsert(positionColumns ? { ...base, ...extra } : base, options);
+
+            /* DB not migrated yet: keep saving chapter + percent exactly as before */
+            if (error && positionColumns && isMissingColumnError(error)) {
+
+                positionColumns = false;
+
+                ({ error } = await supabaseClient
+                    .from("reading_progress")
+                    .upsert(base, options));
+            }
+
+            if (error) console.error("Progress save error:", error);
+
+        } catch (error) {
+
+            console.error("Progress error:", error);
         }
+    });
 
-        updateContinueDisplay(chapterNumber, currentBook, percent);
+    return progressQueue;
+}
 
-    } catch (error) {
+/* Remember the spot (device + account) and refresh the Continue Reading card */
+function persistReadingState(book, chapter, pos) {
 
-        console.error("Progress error:", error);
+    const total = Number(book.total_chapters || 49);
+    const chapterNumber = Number(chapter.chapter_number) || 1;
+
+    const percent = Math.min(
+        100,
+        Math.round(((chapterNumber - 1) + pos.ratio) / total * 100)
+    );
+
+    const state = {
+        bookId: book.id,
+        chapterId: chapter.id,
+        chapterNumber,
+        offset: pos.offset,
+        ratio: pos.ratio,
+        excerpt: pos.excerpt || "",
+        percent,
+        ts: Date.now()
+    };
+
+    writeLocalPosition(state);
+
+    renderContinue(state);
+
+    if (currentUser) upsertProgress(currentUser.id, state);
+}
+
+/* Save where the reader is right now (leaving the page, closing the reader, pausing) */
+function flushReadingPosition() {
+
+    clearTimeout(positionSaveTimer);
+    positionSaveTimer = null;
+    positionBurstStart = 0;
+
+    if (!currentBook || !currentChapter) return;
+
+    const pos = captureReadingPosition();
+
+    if (pos) persistReadingState(currentBook, currentChapter, pos);
+}
+
+function scheduleReadingPositionSave() {
+
+    if (!currentBook || !currentChapter) return;
+
+    const now = Date.now();
+
+    if (!positionBurstStart) positionBurstStart = now;
+
+    clearTimeout(positionSaveTimer);
+
+    /* save once they pause; never go more than ~15s of scrolling without saving */
+    const wait = now - positionBurstStart > 15000 ? 0 : 1500;
+
+    positionSaveTimer = setTimeout(flushReadingPosition, wait);
+}
+
+function setupReadingPositionTracking() {
+
+    const scroller = document.querySelector(".story-reader");
+
+    if (scroller) {
+        scroller.addEventListener("scroll", scheduleReadingPositionSave, { passive: true });
     }
+
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") flushReadingPosition();
+    });
+
+    window.addEventListener("pagehide", flushReadingPosition);
+}
+
+/* Called every time a chapter opens (the position is the top, or the restored spot) */
+async function saveReadingProgress(chapter) {
+
+    clearTimeout(positionSaveTimer);
+
+    if (!currentBook || !chapter) return;
+
+    const pos = captureReadingPosition() || { offset: 0, ratio: 0, excerpt: "" };
+
+    persistReadingState(currentBook, chapter, pos);
 }
 
 /* =========================================================
    LOAD CONTINUE READING
+   Latest of: this account's saved progress (database) and
+   this device's saved position. Guests use the device copy.
 ========================================================= */
 
 async function loadContinueReading() {
 
-    if (!currentUser) {
+    if (!books.length) return;
 
-        updateContinueDisplay(1, books[0] || null);
+    const local = latestLocalPosition();
 
-        return;
+    let row = null;
+
+    if (currentUser) {
+
+        try {
+
+            const baseCols =
+                "book_id, chapter_id, chapter_number, progress_percent, updated_at";
+
+            const query = (cols) => supabaseClient
+                .from("reading_progress")
+                .select(cols)
+                .eq("user_id", currentUser.id)
+                .order("updated_at", { ascending: false })
+                .limit(1);
+
+            let res = await query(
+                positionColumns
+                    ? baseCols + ", read_offset, scroll_ratio, last_excerpt"
+                    : baseCols
+            );
+
+            if (res.error && positionColumns && isMissingColumnError(res.error)) {
+                positionColumns = false;
+                res = await query(baseCols);
+            }
+
+            if (res.error) console.error("Continue reading error:", res.error);
+
+            row = res.data && res.data[0] ? res.data[0] : null;
+
+        } catch (error) {
+
+            console.error("Continue reading failed:", error);
+        }
     }
 
-    try {
+    const rowBook = row && books.find(b => sameId(b.id, row.book_id));
+    const rowTime = row ? Date.parse(row.updated_at) || 0 : 0;
 
-        const { data, error } = await supabaseClient
-            .from("reading_progress")
-            .select(
-                "book_id, chapter_id, chapter_number, progress_percent, updated_at"
-            )
-            .eq("user_id", currentUser.id)
-            .order("updated_at", { ascending: false })
-            .limit(1);
+    let state = null;
 
-        if (error || !data || !data.length) {
+    if (local && (!rowBook || local.ts > rowTime)) {
 
-            updateContinueDisplay(1, books[0] || null);
+        /* this device is ahead of the database (e.g. the tab was closed mid-save) */
+        state = local;
 
-            return;
-        }
+        if (currentUser) upsertProgress(currentUser.id, local);
 
-        const progress = data[0];
+    } else if (rowBook) {
 
-        const book = books.find(item => item.id === progress.book_id);
+        let chapterNumber = Number(row.chapter_number || 0);
 
-        if (!book) {
-
-            updateContinueDisplay(1, books[0] || null);
-
-            return;
-        }
-
-        currentBook = book;
-
-        let chapterNumber = Number(progress.chapter_number || 1);
-
-        /*
-         * If chapter_number wasn't available
-         * for an old progress row, try chapter_id.
-         */
-
-        if (!progress.chapter_number && progress.chapter_id) {
+        if (!chapterNumber && row.chapter_id) {
 
             const { data: chapter } = await supabaseClient
                 .from("chapters")
                 .select("chapter_number")
-                .eq("id", progress.chapter_id)
+                .eq("id", row.chapter_id)
                 .maybeSingle();
 
-            if (chapter) {
-
-                chapterNumber = chapter.chapter_number;
-            }
+            chapterNumber = Number(chapter?.chapter_number || 1);
         }
 
-        updateContinueDisplay(
-            chapterNumber,
-            book,
-            progress.progress_percent
+        state = {
+            bookId: row.book_id,
+            chapterId: row.chapter_id,
+            chapterNumber: chapterNumber || 1,
+            offset: Number(row.read_offset) || 0,
+            ratio: Number(row.scroll_ratio) || 0,
+            excerpt: row.last_excerpt || "",
+            percent: Number(row.progress_percent) || 0,
+            ts: rowTime
+        };
+
+        /* older rows have no position: borrow it from this device if it is the same chapter */
+        if (local && sameId(local.bookId, state.bookId) &&
+            Number(local.chapterNumber) === state.chapterNumber) {
+
+            state.offset = state.offset || local.offset || 0;
+            state.ratio = state.ratio || local.ratio || 0;
+            state.excerpt = state.excerpt || local.excerpt || "";
+        }
+    }
+
+    renderContinue(state);
+
+    /* saved before excerpts existed: read the real chapter text to build one */
+    if (state && !state.excerpt && currentUser && state.chapterId) {
+        fillMissingExcerpt(state);
+    }
+}
+
+async function fillMissingExcerpt(state) {
+
+    try {
+
+        const { data, error } = await supabaseClient.rpc(
+            "get_chapter_for_reader",
+            { p_chapter_id: state.chapterId }
         );
+
+        if (error || !data || !data.length || !data[0].content) return;
+
+        const doc = new DOMParser().parseFromString(formatChapterContent(data[0].content), "text/html");
+        const index = buildTextIndex(doc.body);
+
+        const offset = state.offset || Math.floor((state.ratio || 0) * index.full.length);
+        const excerpt = excerptAt(index.full, offset);
+
+        if (!excerpt || !continueState || !sameId(continueState.chapterId, state.chapterId)) return;
+
+        renderContinue({ ...state, excerpt });
 
     } catch (error) {
 
-        console.error("Continue reading failed:", error);
+        console.error("Excerpt lookup failed:", error);
     }
 }
 
 /* =========================================================
-   UPDATE CONTINUE DISPLAY
+   CONTINUE READING CARD
+   state = { bookId, chapterId, chapterNumber, offset, ratio, excerpt, percent }
+   state === null  ->  nothing read yet: "Start reading this story..."
 ========================================================= */
 
-function updateContinueDisplay(
-    chapterNumber = 1,
-    book = currentBook,
-    savedPercent = null
-) {
+function renderContinue(state) {
 
-    const title = $("continueTitle");
-    const chapter = $("continueChapter");
-    const percentText = $("progressPercent");
-    const numbers = $("progressNumbers");
-    const progressBar = $("continueProgress");
+    const book = state
+        ? books.find(b => sameId(b.id, state.bookId))
+        : books[0] || null;
 
-    if (title) {
+    if (state && !book) state = null;
 
-        title.textContent = book ? book.title : "Vengeance Resurrection";
-    }
-
+    const hasProgress = !!state;
+    const chapterNumber = hasProgress ? state.chapterNumber : 1;
     const total = Number(book?.total_chapters || 49);
+    const percent = hasProgress ? Math.min(100, Math.max(0, Number(state.percent) || 0)) : 0;
 
-    const percent =
-        savedPercent !== null && savedPercent !== undefined
-            ? Number(savedPercent)
-            : Math.round(((Number(chapterNumber) - 1) / total) * 100);
+    continueState = hasProgress ? { ...state, book } : null;
 
-    if (chapter) {
-        chapter.textContent = `Chapter ${chapterNumber}`;
+    const preview = $("continuePreview");
+
+    if (preview) {
+
+        const excerpt = hasProgress ? state.excerpt : "";
+
+        preview.textContent = excerpt
+            ? `\u201C${excerpt}\u201D`
+            : hasProgress
+                ? "Pick up right where you left off."
+                : "Start reading this story...";
+
+        preview.classList.toggle("is-empty", !excerpt);
     }
 
-    if (percentText) {
-        percentText.textContent = `${Math.round(percent)}%`;
-    }
+    if ($("continueTitle")) $("continueTitle").textContent = book ? book.title : "Your story";
+    if ($("continueChapter")) $("continueChapter").textContent = `Chapter ${chapterNumber}`;
+    if ($("progressPercent")) $("progressPercent").textContent = `${Math.round(percent)}%`;
+    if ($("progressNumbers")) $("progressNumbers").textContent = `${chapterNumber} / ${total}`;
+    if ($("continueProgress")) $("continueProgress").style.width = `${percent}%`;
 
-    if (numbers) {
-        numbers.textContent = `${chapterNumber} / ${total}`;
-    }
+    const button = $("continueButton");
 
-    if (progressBar) {
-        progressBar.style.width =
-            `${Math.min(100, Math.max(0, percent))}%`;
-    }
-
-    const continueButton = $("continueButton");
-
-    if (continueButton) {
-
-        continueButton.onclick = () => {
-
-            if (book) {
-                openReader(book.id, chapterNumber);
-            }
-        };
+    if (button) {
+        button.textContent = hasProgress ? "Continue Reading" : "Start Reading";
+        button.disabled = !book;
     }
 }
 
 /* =========================================================
    CONTINUE READING BUTTON
+   Opens the saved chapter AND scrolls to the saved paragraph.
 ========================================================= */
 
 async function continueReading() {
@@ -1840,44 +2351,36 @@ async function continueReading() {
         return;
     }
 
-    if (currentUser) {
+    if (!continueState) await loadContinueReading();
 
-        await loadContinueReading();
+    const target = continueState;
+
+    if (!target) {
+
+        const first = books[0];
+
+        if (first) await openReader(first.id, 1);
+
+        return;
     }
 
-    const book = currentBook || books[0];
+    pendingRestore = {
+        bookId: target.bookId,
+        chapterId: target.chapterId,
+        chapterNumber: target.chapterNumber,
+        offset: target.offset,
+        ratio: target.ratio
+    };
 
-    if (!book) return;
+    try {
 
-    /*
-     * Try to get saved chapter again.
-     */
+        await openReader(target.bookId, target.chapterNumber);
 
-    let chapterNumber = 1;
+    } finally {
 
-    if (currentUser) {
-
-        try {
-
-            const { data } = await supabaseClient
-                .from("reading_progress")
-                .select("chapter_number")
-                .eq("user_id", currentUser.id)
-                .eq("book_id", book.id)
-                .maybeSingle();
-
-            if (data?.chapter_number) {
-
-                chapterNumber = data.chapter_number;
-            }
-
-        } catch (error) {
-
-            console.error("Continue lookup error:", error);
-        }
+        /* a locked chapter never rendered: don't leak the jump into the next chapter */
+        pendingRestore = null;
     }
-
-    openReader(book.id, chapterNumber);
 }
 
 /* =========================================================
@@ -2257,42 +2760,27 @@ function setupGenreButtons() {
 
             const genre = button.dataset.genre;
 
-            filterBooksByGenre(genre);
+            // tapping the active genre again clears the filter
+            filterBooksByGenre(currentGenre === genre ? "" : genre);
+
+            // results live above the genre buttons, so bring them into view
+            const target = $("books");
+            if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
         });
     });
 }
 
 function filterBooksByGenre(genre) {
 
-    const filtered = books.filter(
-        book =>
-            (book.genre || "")
-                .toLowerCase()
-                .includes(genre.toLowerCase())
-    );
+    currentGenre = genre || "";
 
-    if (!filtered.length) {
+    document.querySelectorAll(".genre-card").forEach(button => {
+        const on = !!currentGenre && button.dataset.genre === currentGenre;
+        button.classList.toggle("active", on);
+        button.setAttribute("aria-pressed", on ? "true" : "false");
+    });
 
-        const booksGrid = $("booksGrid");
-
-        if (booksGrid) {
-
-            booksGrid.innerHTML = `
-
-                <div class="empty-message">
-
-                    No ${escapeHtml(genre)}
-                    books found yet.
-
-                </div>
-
-            `;
-        }
-
-        return;
-    }
-
-    renderBooks(filtered);
+    applySort(currentSort);
 }
 
 /* =========================================================
@@ -2321,37 +2809,35 @@ function escapeHtml(value) {
 function setupBookSearch() {
 
     const searchInput = $("bookSearch");
+    const searchForm = $("bookSearchForm");
 
     if (!searchInput) return;
 
+    let timer = null;
+
+    const runSearch = () => {
+        currentQuery = searchInput.value.trim();
+        if (books.length) applySort(currentSort);
+    };
+
+    // live results while typing (short debounce keeps phones smooth)
     searchInput.addEventListener("input", () => {
-
-        const query = searchInput.value.trim().toLowerCase();
-
-        if (!query) {
-
-            applySort(currentSort);
-
-            return;
-        }
-
-        const filtered = books.filter(book => {
-
-            const title = (book.title || "").toLowerCase();
-            const author = (book.author || "").toLowerCase();
-            const genre = (book.genre || "").toLowerCase();
-            const description = (book.description || "").toLowerCase();
-
-            return (
-                title.includes(query) ||
-                author.includes(query) ||
-                genre.includes(query) ||
-                description.includes(query)
-            );
-        });
-
-        renderBooks(filtered);
+        clearTimeout(timer);
+        timer = setTimeout(runSearch, 120);
     });
+
+    // Enter key / search icon: run immediately, close the keyboard on phones
+    if (searchForm) {
+        searchForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            clearTimeout(timer);
+            runSearch();
+            searchInput.blur();
+        });
+    }
+
+    // the "x" clear button on type="search" fires a "search" event
+    searchInput.addEventListener("search", runSearch);
 }
 
 /* =========================================================
