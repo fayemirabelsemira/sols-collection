@@ -1,6 +1,6 @@
 (function () {
     var KEY = "readerTheme";
-    var THEMES = ["white", "beige", "black"];
+    var THEMES = ["white", "beige", "black", "paper", "rose", "midnight", "forest", "sunset"];
     var section = document.getElementById("readerSection");
     var buttons = document.querySelectorAll(".theme-swatch");
 

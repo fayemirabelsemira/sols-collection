@@ -1060,3 +1060,168 @@ body{overflow-x:clip}               /* safety net only — nothing should overfl
   .genre-card{font-size:12px;letter-spacing:.03em}
   .book-cover{width:min(140px,46vw)}
 }
+/* =========================================================
+   COMPACT BOOK CARDS  (smaller cards, more books per row)
+   Keep this block at the very END of the file so it wins.
+   To make cards bigger/smaller later, change the numbers here.
+========================================================= */
+
+/* ---- desktop: 4 per row ---- */
+.books-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:20px}
+.book-card{border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.book-card:hover{transform:translateY(-4px);box-shadow:0 14px 30px rgba(0,0,0,.6),0 0 0 1px var(--gold-soft),0 8px 30px rgba(139,0,0,.35)}
+.book-cover{height:auto;aspect-ratio:2/3}
+.cover-fallback span,.book-cover>span{width:64px;height:64px;font-size:26px}
+.book-information{padding:14px}
+.book-category{font-size:9px;letter-spacing:.14em}
+.book-information h3{font-size:16px;line-height:1.25;margin:4px 0 2px}
+.book-author{font-size:11px;margin-bottom:6px}
+.book-description{font-size:12px;line-height:1.5;-webkit-line-clamp:2;margin-bottom:10px}
+.book-stats{gap:10px;margin:0 0 10px;font-size:11px}
+.book-stats span{gap:4px}
+.book-stats svg{width:13px;height:13px}
+.book-bottom{padding-top:10px;gap:8px}
+.chapter-count{font-size:11px}
+.read-button{padding:7px 14px;font-size:11px}
+
+/* ---- tablet: 3 per row ---- */
+@media(max-width:1000px){
+  .books-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+}
+
+/* ---- phone: 2 per row ---- */
+@media(max-width:700px){
+  .books-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .book-card{border-radius:10px}
+  .book-cover{width:100%;margin:0;border:0;border-bottom:1px solid var(--border);border-radius:0;box-shadow:none;aspect-ratio:2/3}
+  .book-information{padding:8px 9px 10px}
+  .book-category{font-size:8px;letter-spacing:.1em}
+  .book-information h3{font-size:13px;margin:3px 0 1px}
+  .book-author{font-size:10px;margin-bottom:4px}
+  .book-description{font-size:11px;line-height:1.4;-webkit-line-clamp:2;margin-bottom:6px}
+  .book-stats{gap:8px;margin:0 0 6px;font-size:10px}
+  .book-stats svg{width:12px;height:12px}
+  .book-bottom{padding-top:6px;gap:6px}
+  .chapter-count{font-size:10px}
+  .book-bottom .read-button{height:30px;font-size:10px;letter-spacing:.06em;border-radius:8px}
+}
+
+/* =========================================================
+   READER CUSTOMIZER  (themes, accent colors, spacing, width)
+   Keep at the very END of style.css.
+========================================================= */
+
+/* ---------- toolbar button ---------- */
+.rc-open{display:inline-flex;align-items:center;gap:7px}
+.rc-open svg{width:16px;height:16px}
+
+/* ---------- panel ---------- */
+.rc-panel{position:fixed;z-index:2600;width:min(340px,calc(100vw - 24px));max-height:calc(100vh - 150px);overflow-y:auto;
+  background:var(--surface);color:var(--ivory);border:1px solid var(--border);border-radius:14px;
+  box-shadow:0 20px 60px rgba(0,0,0,.55);padding:16px 16px 14px;display:none}
+.rc-panel.open{display:block}
+.rc-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.rc-head h4{font:600 15px var(--font-display);letter-spacing:.06em;color:var(--gold-hi)}
+.rc-close{border:none;background:transparent;color:var(--muted);font-size:20px;line-height:1;padding:2px 6px}
+.rc-close:hover{color:var(--gold-hi)}
+.rc-section{padding:10px 0;border-top:1px solid var(--border)}
+.rc-section:first-of-type{border-top:none}
+.rc-label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.rc-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px 6px}
+.rc-opt{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.rc-opt .theme-swatch{width:34px;height:34px}
+.rc-opt span{font-size:10px;color:var(--muted);text-align:center;white-space:nowrap}
+.rc-accents{display:flex;flex-wrap:wrap;gap:10px}
+.rc-dot{width:28px;height:28px;border-radius:50%;padding:0;border:2px solid var(--border);cursor:pointer;
+  transition:transform var(--ease),box-shadow var(--ease),border-color var(--ease)}
+.rc-dot:hover{transform:scale(1.12)}
+.rc-dot.active{border-color:var(--ivory);box-shadow:0 0 0 3px rgba(128,128,128,.35)}
+.rc-dot.rc-default{background:conic-gradient(#d4af37,#a30000,#d4af37)}
+.rc-seg{display:flex;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.rc-seg button{flex:1;border:none;background:transparent;color:var(--ivory);padding:8px 6px;font-size:12px;transition:background var(--ease),color var(--ease)}
+.rc-seg button+button{border-left:1px solid var(--border)}
+.rc-seg button:hover{background:var(--surface-2)}
+.rc-seg button.active{background:var(--gold);color:var(--rc-on-accent,#111);font-weight:600}
+.rc-reset{width:100%;margin-top:6px;padding:9px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--ivory);font-size:12px;letter-spacing:.06em;transition:all var(--ease)}
+.rc-reset:hover{border-color:var(--gold);color:var(--gold-hi)}
+@media(max-width:700px){
+  .rc-panel{left:8px!important;right:8px;bottom:8px;top:auto!important;width:auto;max-height:70vh}
+}
+
+/* ---------- new page themes: swatch colors ---------- */
+.theme-swatch[data-reader-theme="paper"]{background:#fbf9f4}
+.theme-swatch[data-reader-theme="rose"]{background:#f3e3df}
+.theme-swatch[data-reader-theme="midnight"]{background:#0e1a33}
+.theme-swatch[data-reader-theme="forest"]{background:#10231a}
+.theme-swatch[data-reader-theme="sunset"]{background:#2a1230}
+
+/* ---------- new page themes: colors ---------- */
+/* Paper (light) */
+#readerSection[data-reader-theme="paper"]{
+  --obsidian:#fbf9f4; --surface:#f2efe7; --surface-2:#e8e4d9;
+  --ivory:#2a2a2a; --muted:#6b6b66;
+  --gold:#8a6a12; --gold-hi:#7a5a0a; --border:rgba(0,0,0,.14);
+}
+/* Sepia Rose (light) */
+#readerSection[data-reader-theme="rose"]{
+  --obsidian:#f3e3df; --surface:#ead3ce; --surface-2:#e1c4be;
+  --ivory:#4a2a30; --muted:#7d5a60;
+  --gold:#9a4455; --gold-hi:#862f41; --border:rgba(120,50,60,.25);
+}
+/* Midnight Blue (dark) */
+#readerSection[data-reader-theme="midnight"]{
+  --obsidian:#0e1a33; --surface:#13223f; --surface-2:#192b4d;
+  --ivory:#e3e9f5; --muted:#9fb0cf;
+  --gold:#9db8e8; --gold-hi:#c3d5f5; --border:rgba(157,184,232,.25);
+  --crimson:#1f3a73; --crimson-hi:#2b4f9e; --crimson-deep:#16294f;
+  --crimson-grad:linear-gradient(145deg,#2b4f9e,#16294f);
+  --brushed:linear-gradient(135deg,#7f9fd6 0%,#c3d5f5 45%,#9db8e8 100%);
+}
+/* Forest (dark) */
+#readerSection[data-reader-theme="forest"]{
+  --obsidian:#10231a; --surface:#16301f; --surface-2:#1c3a27;
+  --ivory:#eaf1e2; --muted:#a6bba9;
+  --gold:#c9b26a; --gold-hi:#e3d089; --border:rgba(201,178,106,.25);
+  --crimson:#1f5a37; --crimson-hi:#2a7a4a; --crimson-deep:#14391f;
+  --crimson-grad:linear-gradient(145deg,#2a7a4a,#14391f);
+}
+/* Sunset / plum (dark) */
+#readerSection[data-reader-theme="sunset"]{
+  --obsidian:#2a1230; --surface:#351740; --surface-2:#401c4c;
+  --ivory:#f6e8ee; --muted:#c9a8bd;
+  --gold:#f2a65a; --gold-hi:#ffc27d; --border:rgba(242,166,90,.28);
+  --crimson:#8a2a5c; --crimson-hi:#b0366f; --crimson-deep:#5a1a3d;
+  --crimson-grad:linear-gradient(145deg,#b0366f,#5a1a3d);
+  --brushed:linear-gradient(135deg,#d9822f 0%,#ffc27d 45%,#f2a65a 100%);
+}
+
+/* story text follows the theme for every new theme */
+#readerSection[data-reader-theme="paper"] .story-content,
+#readerSection[data-reader-theme="rose"] .story-content,
+#readerSection[data-reader-theme="midnight"] .story-content,
+#readerSection[data-reader-theme="forest"] .story-content,
+#readerSection[data-reader-theme="sunset"] .story-content{color:var(--ivory)}
+
+/* readable text on buttons in the new light themes */
+#readerSection[data-reader-theme="paper"] .chapter-item.active,
+#readerSection[data-reader-theme="rose"] .chapter-item.active,
+#readerSection[data-reader-theme="paper"] .chapter-item.active .chapter-number,
+#readerSection[data-reader-theme="rose"] .chapter-item.active .chapter-number,
+#readerSection[data-reader-theme="paper"] .reader-nav-button.primary,
+#readerSection[data-reader-theme="rose"] .reader-nav-button.primary{color:#f5d77a}
+
+/* same small fixes the white/beige themes already get */
+#readerSection[data-reader-theme="paper"] .stat-icon.sun,
+#readerSection[data-reader-theme="rose"] .stat-icon.sun{color:#B8901F}
+#readerSection[data-reader-theme="paper"] mark.bm-hl,
+#readerSection[data-reader-theme="rose"] mark.bm-hl{background:rgba(212,160,30,.34);box-shadow:0 0 0 2px rgba(212,160,30,.14)}
+#readerSection[data-reader-theme="paper"] ::highlight(cx-names),
+#readerSection[data-reader-theme="rose"] ::highlight(cx-names){text-decoration:underline dotted rgba(139,0,0,.75);text-decoration-thickness:1.5px}
+#readerSection[data-reader-theme="paper"] ::highlight(pop-lines),
+#readerSection[data-reader-theme="rose"] ::highlight(pop-lines){background-color:rgba(184,144,31,.14);text-decoration:underline rgba(139,0,0,.35);text-decoration-thickness:1.5px}
+
+/* ---------- reading comfort: line spacing + text width ---------- */
+#readerSection .story-content{line-height:var(--rc-lh,2)}
+@media(min-width:701px){
+  #readerSection .story-reader{padding-left:max(5%,calc((100% - var(--rc-width,760px))/2));padding-right:max(5%,calc((100% - var(--rc-width,760px))/2))}
+}
