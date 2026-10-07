@@ -1,0 +1,12 @@
+{
+  "name": "sols-collection",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "deploy": "node build.mjs && wrangler deploy -c wrangler.build.jsonc"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "wrangler": "^4.0.0"
+  }
+}

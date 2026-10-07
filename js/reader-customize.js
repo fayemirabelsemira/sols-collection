@@ -6,7 +6,7 @@
      - line spacing
      - text width
    Font size (A- / A+) and font style already exist in the toolbar.
-   Load AFTER reader-theme.js.
+   This file owns ALL page-theme logic, including the toolbar swatches.
 ========================================================= */
 (function () {
     "use strict";
@@ -172,6 +172,14 @@
         markActive(panel, "data-width", item.id);
     }
 
+    /* ONE click handler for every swatch (toolbar + panel) */
+    document.addEventListener("click", function (e) {
+        var sw = e.target.closest && e.target.closest(".theme-swatch");
+        if (!sw) return;
+        var id = sw.getAttribute("data-reader-theme");
+        if (id) applyTheme(id);
+    });
+
     /* ---------- build the panel ---------- */
 
     var panel = document.createElement("div");
@@ -212,7 +220,6 @@
         b.setAttribute("data-reader-theme", t.id);
         b.setAttribute("title", t.name);
         b.setAttribute("aria-label", t.name + " page");
-        b.addEventListener("click", function () { applyTheme(t.id); });
         opt.appendChild(b);
         opt.appendChild(el("span", "", t.name));
         themeGrid.appendChild(opt);
@@ -325,13 +332,10 @@
         if (panel.classList.contains("open")) positionPanel();
     });
 
-    /* the reader closing (or a toolbar swatch being clicked) keeps everything in sync */
+    /* close the panel when the reader closes */
     new MutationObserver(function () {
-        var theme = currentTheme();
-        markActive(panel, "data-reader-theme", theme.id);
-        applyAccent(read(KEYS.accent, DEFAULTS.accent), true);
         if (!section.classList.contains("active")) closePanel();
-    }).observe(section, { attributes: true, attributeFilter: ["data-reader-theme", "class"] });
+    }).observe(section, { attributes: true, attributeFilter: ["class"] });
 
     /* ---------- restore saved choices ---------- */
 

@@ -1,0 +1,12 @@
+{
+  // Copy these settings into wrangler.jsonc ONLY if you install the preview Worker.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sol",
+  "main": "optional-share-previews/worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": ["/b/*"]
+  }
+}

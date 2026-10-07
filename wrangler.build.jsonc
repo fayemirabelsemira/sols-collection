@@ -1,0 +1,10 @@
+{
+  // Used ONLY by "npm run deploy". Publishes the minified dist/ folder,
+  // so nothing else in the project (wrangler.jsonc, sql/, .git...) can ever be public.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sol",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./dist"
+  }
+}

@@ -20,6 +20,7 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+<a class="skip-link" href="#top">Skip to content</a>
 
 <!-- HEADER -->
 <header class="site-header">
@@ -55,7 +56,7 @@
   <button id="mobileLogoutButton" type="button" class="hidden">Logout</button>
 </div>
 
-<main id="top">
+<main id="top" tabindex="-1">
 
 <!-- BOOKS -->
 <section id="books" class="section books-section">
@@ -319,6 +320,7 @@
       <input id="loginEmail" type="email" placeholder="you@example.com" required>
       <label for="loginPassword">Password</label>
       <input id="loginPassword" type="password" placeholder="Your password" required>
+      <button id="forgotPasswordLink" class="auth-link" type="button">Forgot password?</button>
       <button type="submit" class="auth-submit">Login</button>
     </form>
     <p class="auth-switch">Don't have an account? <button id="switchToSignup" type="button">Sign Up</button></p>
@@ -345,6 +347,41 @@
   </div>
 </div>
 
+<!-- FORGOT PASSWORD MODAL -->
+<div id="forgotModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-box auth-box">
+    <button class="modal-close" data-close="forgotModal" type="button" aria-label="Close">×</button>
+    <p class="section-label">ACCOUNT HELP</p>
+    <h2>Reset Password</h2>
+    <p class="auth-help">Enter your email and we'll send you a link to set a new password.</p>
+    <form id="forgotForm">
+      <label for="forgotEmail">Email</label>
+      <input id="forgotEmail" type="email" placeholder="you@example.com" autocomplete="email" required>
+      <button id="forgotSubmit" type="submit" class="auth-submit">Send reset link</button>
+    </form>
+    <p class="auth-switch">Never got your confirmation email? <button id="resendConfirmButton" type="button">Resend it</button></p>
+    <p class="auth-switch"><button id="backToLogin" type="button">Back to login</button></p>
+  </div>
+</div>
+
+<!-- NEW PASSWORD MODAL (opens from the link in the reset email) -->
+<div id="resetModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-box auth-box">
+    <button class="modal-close" data-close="resetModal" type="button" aria-label="Close">×</button>
+    <p class="section-label">ALMOST DONE</p>
+    <h2>Set a New Password</h2>
+    <form id="resetForm">
+      <label for="newPassword">New password</label>
+      <input id="newPassword" type="password" placeholder="At least 6 characters" minlength="6" autocomplete="new-password" required>
+      <label for="confirmPassword">Confirm new password</label>
+      <input id="confirmPassword" type="password" placeholder="Type it again" minlength="6" autocomplete="new-password" required>
+      <button id="resetSubmit" type="submit" class="auth-submit">Save password</button>
+    </form>
+  </div>
+</div>
+
 <!-- FOOTER -->
 <footer class="site-footer">
   <div class="footer-logo">Sol's Collection</div>
@@ -362,9 +399,10 @@
 <script src="js/ui.js"></script>
 <script src="js/script.js"></script>
 <script src="js/comments.js"></script>
-<script src="js/reader-theme.js"></script>
+<script src="js/reader-mobile.js"></script>
 <script src="js/reader-customize.js"></script>
 <script src="js/bookmarks.js"></script>
 <script src="js/reader-extras.js"></script>
+<script src="js/a11y.js"></script>
 </body>
 </html>

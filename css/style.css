@@ -1247,3 +1247,21 @@ body{overflow-x:clip}               /* safety net only — nothing should overfl
 }
 .footer-legal a{color:var(--gold-hi,#d4af37);text-decoration:none;opacity:.85}
 .footer-legal a:hover,.footer-legal a:focus-visible{opacity:1;text-decoration:underline}
+
+/* ---- forgot / reset password ---- */
+.auth-link{
+  display:block;margin:-6px 0 16px;padding:0;border:0;background:transparent;
+  color:var(--gold-hi);font-size:13px;font-weight:600;text-align:left;cursor:pointer;
+}
+.auth-link:hover{text-decoration:underline}
+.auth-help{margin:0 0 16px;color:var(--muted);font-size:14px;line-height:1.55}
+
+/* ---- skip link ---- */
+.skip-link{
+  position:fixed;left:12px;top:-64px;z-index:5000;
+  padding:10px 16px;border-radius:8px;
+  background:var(--gold);color:#111;font-weight:700;text-decoration:none;
+  transition:top .15s ease;
+}
+.skip-link:focus{top:12px}
+#top:focus{outline:none}

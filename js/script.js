@@ -83,6 +83,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     handlePaymentReturn();
 
+    handleAuthLinkErrors();
+
     setupTheme();
     setupNavigation();
     setupModals();
@@ -96,6 +98,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     await checkUser();
     await loadBooks();
+
+    routeFromLocation();
+
+    window.addEventListener("hashchange", onHashChange);
 
     if (paymentReturn) await verifyPaymentAndUnlock(paymentReturn);
 });
@@ -273,6 +279,8 @@ function closeModal(id) {
     modal.classList.remove("active");
 
     document.body.classList.remove("modal-open");
+
+    if (id === "bookModal") clearBookHash();
 }
 
 /* =========================================================
@@ -309,6 +317,15 @@ async function checkUser() {
 
     supabaseClient.auth.onAuthStateChange(
         async (_event, session) => {
+
+            /* the reset-password email link lands here */
+            if (_event === "PASSWORD_RECOVERY") {
+
+                closeModal("loginModal");
+                closeModal("signupModal");
+                closeModal("forgotModal");
+                openModal("resetModal");
+            }
 
             currentUser = session?.user || null;
 
@@ -386,6 +403,194 @@ function setupAuthentication() {
             openModal("loginModal");
         });
     }
+
+    const forgotLink = $("forgotPasswordLink");
+    const backToLogin = $("backToLogin");
+
+    if (forgotLink) {
+        forgotLink.addEventListener("click", () => {
+
+            /* carry over whatever email they already typed */
+            const typed = $("loginEmail") ? $("loginEmail").value.trim() : "";
+            if (typed && $("forgotEmail")) $("forgotEmail").value = typed;
+
+            closeModal("loginModal");
+            openModal("forgotModal");
+        });
+    }
+
+    if (backToLogin) {
+        backToLogin.addEventListener("click", () => {
+            closeModal("forgotModal");
+            openModal("loginModal");
+        });
+    }
+
+    if ($("forgotForm")) $("forgotForm").addEventListener("submit", requestPasswordReset);
+    if ($("resendConfirmButton")) $("resendConfirmButton").addEventListener("click", resendConfirmation);
+    if ($("resetForm")) $("resetForm").addEventListener("submit", saveNewPassword);
+}
+
+/* Disable a button for a few seconds so people can't hammer the email limit */
+function cooldownButton(button, seconds) {
+
+    if (!button) return;
+
+    const label = button.textContent;
+    let left = seconds;
+
+    button.disabled = true;
+
+    const tick = setInterval(() => {
+
+        left -= 1;
+
+        if (left <= 0) {
+            clearInterval(tick);
+            button.disabled = false;
+            button.textContent = label;
+            return;
+        }
+
+        button.textContent = `${label} (${left}s)`;
+
+    }, 1000);
+}
+
+async function requestPasswordReset(event) {
+
+    event.preventDefault();
+
+    const email = $("forgotEmail").value.trim();
+
+    if (!email) return;
+
+    try {
+
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin
+        });
+
+        if (error && error.status === 429) {
+
+            solToast("Please wait a minute before asking for another email.");
+
+            return;
+        }
+
+        if (error) console.error("Reset email error:", error);
+
+        /* same message whether or not the email has an account (no account guessing) */
+        solToast("If that email has an account, a reset link is on its way. Check your spam folder too.", { duration: 7000 });
+
+        cooldownButton($("forgotSubmit"), 30);
+
+    } catch (error) {
+
+        console.error(error);
+
+        solToast("Something went wrong. Please try again.");
+    }
+}
+
+async function resendConfirmation() {
+
+    const email = $("forgotEmail").value.trim();
+
+    if (!email) {
+
+        solToast("Type your email in the box above first.");
+
+        $("forgotEmail").focus();
+
+        return;
+    }
+
+    try {
+
+        const { error } = await supabaseClient.auth.resend({
+            type: "signup",
+            email,
+            options: { emailRedirectTo: window.location.origin }
+        });
+
+        if (error && error.status === 429) {
+
+            solToast("Please wait a minute before asking for another email.");
+
+            return;
+        }
+
+        if (error) console.error("Resend error:", error);
+
+        solToast("If that email still needs confirming, a new link is on its way. Check your spam folder too.", { duration: 7000 });
+
+        cooldownButton($("resendConfirmButton"), 30);
+
+    } catch (error) {
+
+        console.error(error);
+
+        solToast("Something went wrong. Please try again.");
+    }
+}
+
+async function saveNewPassword(event) {
+
+    event.preventDefault();
+
+    const password = $("newPassword").value;
+    const confirm = $("confirmPassword").value;
+
+    if (password.length < 6) {
+
+        solToast("Password must be at least 6 characters.");
+
+        return;
+    }
+
+    if (password !== confirm) {
+
+        solToast("The two passwords don't match.");
+
+        return;
+    }
+
+    try {
+
+        const { error } = await supabaseClient.auth.updateUser({ password });
+
+        if (error) {
+
+            solToast("Couldn't update your password: " + error.message);
+
+            return;
+        }
+
+        $("resetForm").reset();
+
+        closeModal("resetModal");
+
+        solToast("Password updated. You're logged in.");
+
+    } catch (error) {
+
+        console.error(error);
+
+        solToast("Something went wrong. Please try again.");
+    }
+}
+
+/* An expired or already-used email link comes back with an error in the address bar */
+function handleAuthLinkErrors() {
+
+    if (!/error_code=otp_expired|error=access_denied/.test(window.location.hash)) return;
+
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+
+    solToast("That email link has expired or was already used. Request a new one.", { duration: 7000 });
+
+    openModal("forgotModal");
 }
 
 async function login(event) {
@@ -550,10 +755,29 @@ async function loadBooks() {
 
     try {
 
-        const { data, error } = await supabaseClient
-            .from("books")
-            .select("*")
-            .order("created_at", { ascending: false });
+        /* Fetch in pages of 200 so a big catalog never hits the 1000-row cap */
+        const PAGE_SIZE = 200;
+        let data = [];
+        let error = null;
+
+        for (let from = 0; ; from += PAGE_SIZE) {
+
+            const page = await supabaseClient
+                .from("books")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .order("id", { ascending: true })
+                .range(from, from + PAGE_SIZE - 1);
+
+            if (page.error) {
+                error = page.error;
+                break;
+            }
+
+            data = data.concat(page.data || []);
+
+            if (!page.data || page.data.length < PAGE_SIZE) break;
+        }
 
         if (error) {
 
@@ -710,6 +934,7 @@ function renderBooks(list = books) {
                     src="${escapeHtml(book.cover_url)}"
                     alt="${escapeHtml(book.title)}"
                     loading="lazy"
+                    decoding="async"
                 >
               `
             : `
@@ -882,6 +1107,11 @@ async function showBook(bookId) {
             ${ICON_SUN}
             <span id="voteButtonText">${alreadyVoted ? "Voted" : "Vote"}</span>
         </button>
+
+        <button id="shareBookButton" class="vote-button share-button" type="button" title="Share this book">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>
+            <span>Share</span>
+        </button>
     `;
 
     const voteBtn = $("voteButton");
@@ -891,6 +1121,10 @@ async function showBook(bookId) {
     }
 
     if (!alreadyVoted) syncVoteState(book.id);
+
+    const shareBtn = $("shareBookButton");
+
+    if (shareBtn) shareBtn.onclick = shareCurrentBook;
 
     const cover = $("modalBookCover");
 
@@ -922,6 +1156,8 @@ async function showBook(bookId) {
     }
 
     openModal("bookModal");
+
+    setBookHash(book);
 
     refreshSynopsisToggle();
 }
@@ -1476,7 +1712,15 @@ function sanitizeChapterHtml(html) {
 
     doc.body.querySelectorAll("*").forEach(node => {
 
-        if (CHAPTER_ALLOWED_TAGS.indexOf(node.tagName.toLowerCase()) === -1) {
+        const tag = node.tagName.toLowerCase();
+
+        /* dangerous elements are removed together with their contents */
+        if (/^(script|style|iframe|object|embed|link|meta|base|form|svg|math|template|noscript)$/.test(tag)) {
+            node.remove();
+            return;
+        }
+
+        if (CHAPTER_ALLOWED_TAGS.indexOf(tag) === -1) {
             node.replaceWith(...node.childNodes);
             return;
         }
@@ -2969,6 +3213,166 @@ function filterBooksByGenre(genre) {
 /* =========================================================
    ESCAPE HTML
 ========================================================= */
+
+/* =========================================================
+   BOOK LINKS  (#/book/<slug>)
+   Opening a book puts a shareable link in the address bar;
+   opening that link on any device opens the same book.
+   Set SHARE_PATH_LINKS to true ONLY after you install the optional
+   Cloudflare Worker in optional-share-previews/ (it gives /b/<slug>
+   links proper previews on Facebook, Messenger, X, etc.).
+========================================================= */
+
+const SHARE_PATH_LINKS = false;
+
+function slugify(text) {
+
+    return String(text || "")
+        .normalize("NFKD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 60);
+}
+
+function bookSlug(book) {
+
+    const base = slugify(book.title) || "book";
+
+    const clash = books.some(
+        other => other.id !== book.id && (slugify(other.title) || "book") === base
+    );
+
+    return clash ? `${base}-${String(book.id).slice(0, 4)}` : base;
+}
+
+function findBookBySlug(slug) {
+
+    return books.find(book => bookSlug(book) === slug) || null;
+}
+
+function bookLink(book) {
+
+    return SHARE_PATH_LINKS
+        ? `${window.location.origin}/b/${bookSlug(book)}`
+        : `${window.location.origin}/#/book/${bookSlug(book)}`;
+}
+
+function slugFromLocation() {
+
+    const hashMatch = window.location.hash.match(/^#\/book\/([^/?#]+)/);
+
+    if (hashMatch) return decodeURIComponent(hashMatch[1]);
+
+    const pathMatch = window.location.pathname.match(/^\/b\/([^/]+)\/?$/);
+
+    return pathMatch ? decodeURIComponent(pathMatch[1]) : null;
+}
+
+function setBookHash(book) {
+
+    if (/^\/b\//.test(window.location.pathname)) return;
+
+    const target = "#/book/" + bookSlug(book);
+
+    if (window.location.hash !== target) {
+
+        window.history.replaceState(
+            null, "", window.location.pathname + window.location.search + target
+        );
+    }
+}
+
+function clearBookHash() {
+
+    if (/^\/b\//.test(window.location.pathname)) {
+
+        window.history.replaceState(null, "", "/");
+
+        return;
+    }
+
+    if (/^#\/book\//.test(window.location.hash)) {
+
+        window.history.replaceState(
+            null, "", window.location.pathname + window.location.search
+        );
+    }
+}
+
+function routeFromLocation() {
+
+    const slug = slugFromLocation();
+
+    if (!slug) return;
+
+    const book = findBookBySlug(slug);
+
+    if (!book) {
+
+        solToast("We couldn't find that book.");
+
+        clearBookHash();
+
+        return;
+    }
+
+    showBook(book.id);
+}
+
+function onHashChange() {
+
+    const modal = $("bookModal");
+    const open = !!modal && modal.classList.contains("active");
+    const slug = slugFromLocation();
+
+    if (slug) {
+
+        const book = findBookBySlug(slug);
+
+        if (book && !(open && currentBook && currentBook.id === book.id)) {
+            showBook(book.id);
+        }
+
+    } else if (open && window.location.hash === "") {
+
+        closeModal("bookModal");
+    }
+}
+
+async function shareCurrentBook() {
+
+    if (!currentBook) return;
+
+    const url = bookLink(currentBook);
+
+    const data = {
+        title: currentBook.title,
+        text: `Read "${currentBook.title}" on Sol's Collection`,
+        url
+    };
+
+    try {
+
+        if (navigator.share) {
+
+            await navigator.share(data);
+
+            return;
+        }
+
+        await navigator.clipboard.writeText(url);
+
+        solToast("Link copied!");
+
+    } catch (error) {
+
+        if (error && error.name === "AbortError") return;
+
+        solToast("Copy this link: " + url, { duration: 9000 });
+    }
+}
 
 function escapeHtml(value) {
 
