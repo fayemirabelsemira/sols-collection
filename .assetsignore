@@ -1,4 +1,12 @@
-  .git
-  .gitignore
-  .vscode
-  .assetsignore
+  # Files that must NOT be published to the public site
+wrangler.jsonc
+.assetsignore
+sql
+node_modules
+.git
+.github
+.wrangler
+.dev.vars
+*.md
+.gitignore
+.vscode

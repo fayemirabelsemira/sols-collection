@@ -496,7 +496,7 @@
 
         if (res.error || !res.data || !res.data.length) {
             console.error("Delete error:", res.error);
-            alert("Couldn't delete this comment.");
+            (window.solToast || window.alert)("Couldn't delete this comment.");
             return;
         }
 

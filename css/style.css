@@ -1225,3 +1225,25 @@ body{overflow-x:clip}               /* safety net only — nothing should overfl
 @media(min-width:701px){
   #readerSection .story-reader{padding-left:max(5%,calc((100% - var(--rc-width,760px))/2));padding-right:max(5%,calc((100% - var(--rc-width,760px))/2))}
 }
+/* ---- site toast (replaces alert()) ---- */
+.sol-toast{
+  position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));z-index:4000;
+  transform:translate(-50%,16px);
+  max-width:min(92vw,460px);padding:12px 18px;
+  background:#141414;color:var(--ivory);
+  border:1px solid var(--gold-soft);border-radius:14px;
+  box-shadow:0 12px 34px rgba(0,0,0,.6);
+  font-size:14px;line-height:1.45;text-align:center;
+  opacity:0;pointer-events:none;
+  transition:opacity .2s ease,transform .2s ease;
+}
+.sol-toast.show{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){.sol-toast{transition:none}}
+
+/* ---- footer legal links ---- */
+.footer-legal{
+  display:flex;flex-wrap:wrap;justify-content:center;gap:6px 18px;
+  margin:14px 0 4px;font-size:13px;
+}
+.footer-legal a{color:var(--gold-hi,#d4af37);text-decoration:none;opacity:.85}
+.footer-legal a:hover,.footer-legal a:focus-visible{opacity:1;text-decoration:underline}

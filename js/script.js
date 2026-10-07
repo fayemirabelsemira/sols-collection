@@ -96,6 +96,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     await checkUser();
     await loadBooks();
+
+    if (paymentReturn) await verifyPaymentAndUnlock(paymentReturn);
 });
 
 /* =========================================================
@@ -402,7 +404,7 @@ async function login(event) {
 
         if (error) {
 
-            alert("Login failed: " + error.message);
+            solToast("Login failed: " + error.message);
 
             return;
         }
@@ -415,7 +417,7 @@ async function login(event) {
 
         $("loginForm").reset();
 
-        alert("Welcome back!");
+        solToast("Welcome back!");
 
         await loadContinueReading();
 
@@ -447,7 +449,7 @@ async function login(event) {
 
         console.error(error);
 
-        alert("Something went wrong while logging in.");
+        solToast("Something went wrong while logging in.");
     }
 }
 
@@ -477,7 +479,7 @@ async function signup(event) {
 
         if (error) {
 
-            alert("Sign up failed: " + error.message);
+            solToast("Sign up failed: " + error.message);
 
             return;
         }
@@ -492,18 +494,18 @@ async function signup(event) {
 
             updateAuthUI();
 
-            alert("Account created successfully!");
+            solToast("Account created successfully!");
 
         } else {
 
-            alert("Account created! Please check your email to confirm your account.");
+            solToast("Account created! Please check your email to confirm your account.");
         }
 
     } catch (error) {
 
         console.error(error);
 
-        alert("Something went wrong while creating your account.");
+        solToast("Something went wrong while creating your account.");
     }
 }
 
@@ -513,7 +515,7 @@ async function logout() {
 
     if (error) {
 
-        alert("Logout failed: " + error.message);
+        solToast("Logout failed: " + error.message);
 
         return;
     }
@@ -526,7 +528,7 @@ async function logout() {
 
     closeReader();
 
-    alert("You have been logged out.");
+    solToast("You have been logged out.");
 }
 
 /* =========================================================
@@ -699,8 +701,8 @@ function renderBooks(list = books) {
         const genre = book.genre || "Romance";
         const chapters = book.total_chapters || 0;
 
-        const views = Number(book.views || 2000000).toLocaleString();
-        const votes = Number(book.votes || 100000).toLocaleString();
+        const views = (Number(book.views) || 0).toLocaleString();
+        const votes = (Number(book.votes) || 0).toLocaleString();
 
         const coverHtml = book.cover_url
             ? `
@@ -839,12 +841,12 @@ async function showBook(bookId) {
         priceEl.textContent = "₱" + getBookPrice(book);
     }
 
-    const views = Number(book.views || 2000000).toLocaleString();
+    const views = (Number(book.views) || 0).toLocaleString();
 
-    const votes = Number(book.votes || 100000).toLocaleString();
+    const votes = (Number(book.votes) || 0).toLocaleString();
 
     const alreadyVoted =
-        localStorage.getItem(`voted-book-${book.id}`) === "true";
+        !!currentUser && localStorage.getItem(votedKey(book.id)) === "true";
 
     let statsContainer = document.getElementById("modalStats");
 
@@ -887,6 +889,8 @@ async function showBook(bookId) {
     if (voteBtn && !alreadyVoted) {
         voteBtn.onclick = () => voteBook(book.id);
     }
+
+    if (!alreadyVoted) syncVoteState(book.id);
 
     const cover = $("modalBookCover");
 
@@ -1024,12 +1028,12 @@ function updateReaderStats(book) {
 
     if (viewsEl) {
         viewsEl.innerHTML =
-            `${ICON_EYE}<span>${Number(book.views || 2000000).toLocaleString()}</span>`;
+            `${ICON_EYE}<span>${(Number(book.views) || 0).toLocaleString()}</span>`;
     }
 
     if (votesEl) {
         votesEl.innerHTML =
-            `${ICON_SUN}<span>${Number(book.votes || 100000).toLocaleString()}</span>`;
+            `${ICON_SUN}<span>${(Number(book.votes) || 0).toLocaleString()}</span>`;
     }
 }
 
@@ -1115,14 +1119,12 @@ async function loadChapterList() {
 
             console.error("Failed to load chapter list:", error);
 
-            alert("Failed to load chapters.");
+            solToast("Failed to load chapters.");
 
             return;
         }
 
         currentChapters = data || [];
-
-        console.log("Loaded chapter metadata:", currentChapters);
 
         const chapterList = $("chapterList");
 
@@ -1202,7 +1204,7 @@ async function loadChapterList() {
 
         console.error("Chapter list error:", error);
 
-        alert("Something went wrong while loading chapters.");
+        solToast("Something went wrong while loading chapters.");
     }
 }
 
@@ -1318,15 +1320,6 @@ async function openChapter(index) {
 
     currentChapter = chapter;
 
-    console.log("Clicked chapter:", chapter);
-
-    console.log(
-        "is_free:",
-        chapter.is_free,
-        "type:",
-        typeof chapter.is_free
-    );
-
     const isFree =
         chapter.is_free === true ||
         chapter.is_free === "true" ||
@@ -1357,7 +1350,7 @@ async function openChapter(index) {
 
         pendingChapter = chapter;
 
-        alert("Please log in first to unlock full access.");
+        solToast("Please log in first to unlock full access.");
 
         openModal("loginModal");
 
@@ -1400,9 +1393,20 @@ async function openChapter(index) {
    OR paid for the full book.
 ========================================================= */
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isUuid(value) {
+    return typeof value === "string" && UUID_RE.test(value);
+}
+
 async function isChapterUnlocked(chapterId) {
 
     if (!currentUser) {
+        return false;
+    }
+
+    /* IDs go into a filter string below, so only accept real UUIDs */
+    if (!isUuid(chapterId) || !isUuid(currentBook?.id)) {
         return false;
     }
 
@@ -1445,9 +1449,60 @@ async function isChapterUnlocked(chapterId) {
    preview so text positions always match.
 ========================================================= */
 
+const CHAPTER_ALLOWED_TAGS = [
+    "p", "br", "hr", "div", "span", "em", "strong", "b", "i", "u", "s", "sub", "sup",
+    "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "ul", "ol", "li", "a", "img"
+];
+
+const CHAPTER_ALLOWED_ATTR = [
+    "class", "style", "href", "src", "alt", "title", "target", "rel"
+];
+
+/* Strips scripts, event handlers (onerror=...) and javascript: links. */
+function sanitizeChapterHtml(html) {
+
+    if (!html) return "";
+
+    if (window.DOMPurify) {
+
+        return window.DOMPurify.sanitize(html, {
+            ALLOWED_TAGS: CHAPTER_ALLOWED_TAGS,
+            ALLOWED_ATTR: CHAPTER_ALLOWED_ATTR
+        });
+    }
+
+    /* Fallback if the DOMPurify script failed to load: allow-list by hand */
+    const doc = new DOMParser().parseFromString(html, "text/html");
+
+    doc.body.querySelectorAll("*").forEach(node => {
+
+        if (CHAPTER_ALLOWED_TAGS.indexOf(node.tagName.toLowerCase()) === -1) {
+            node.replaceWith(...node.childNodes);
+            return;
+        }
+
+        Array.from(node.attributes).forEach(attr => {
+
+            const name = attr.name.toLowerCase();
+            const value = attr.value.trim().toLowerCase();
+
+            if (
+                CHAPTER_ALLOWED_ATTR.indexOf(name) === -1 ||
+                ((name === "href" || name === "src") && !/^(https?:|mailto:|\/|#|data:image\/)/.test(value))
+            ) {
+                node.removeAttribute(attr.name);
+            }
+        });
+    });
+
+    return doc.body.innerHTML;
+}
+
 function formatChapterContent(html) {
 
     if (!html) return "";
+
+    html = sanitizeChapterHtml(html);
 
     const doc = new DOMParser().parseFromString(html, "text/html");
 
@@ -1497,8 +1552,6 @@ async function loadChapterContent(chapter) {
 
     try {
 
-        console.log("Loading chapter:", chapter.chapter_number);
-
         const { data, error } = await supabaseClient.rpc(
             "get_chapter_for_reader",
             { p_chapter_id: chapter.id }
@@ -1508,7 +1561,7 @@ async function loadChapterContent(chapter) {
 
             console.error("Failed to load chapter:", error);
 
-            alert("Unable to load this chapter.");
+            solToast("Unable to load this chapter.");
 
             return;
         }
@@ -1519,8 +1572,6 @@ async function loadChapterContent(chapter) {
          */
 
         if (!data || data.length === 0) {
-
-            console.log("Chapter is locked.");
 
             if (!currentUser) {
 
@@ -1541,8 +1592,6 @@ async function loadChapterContent(chapter) {
         const loadedChapter = data[0];
 
         currentChapter = loadedChapter;
-
-        console.log("Chapter loaded:", loadedChapter.chapter_number);
 
         /* =================================================
            UPDATE READER TITLE
@@ -1642,7 +1691,7 @@ async function loadChapterContent(chapter) {
 
         console.error("Chapter content error:", error);
 
-        alert("Something went wrong while opening this chapter.");
+        solToast("Something went wrong while opening this chapter.");
     }
 }
 
@@ -2346,7 +2395,7 @@ async function continueReading() {
 
     if (!books.length) {
 
-        alert("Books are still loading.");
+        solToast("Books are still loading.");
 
         return;
     }
@@ -2480,7 +2529,7 @@ async function startRealPayment() {
 
             console.error("Create payment error:", error);
 
-            alert("Failed to create payment. Please try again.");
+            solToast("Failed to create payment. Please try again.");
 
             button.disabled = false;
 
@@ -2489,13 +2538,11 @@ async function startRealPayment() {
             return;
         }
 
-        console.log("Payment response:", data);
-
         if (!data || data.error) {
 
             console.error(data);
 
-            alert(
+            solToast(
                 data?.error ||
                 "Failed to create payment. Please try again."
             );
@@ -2511,9 +2558,9 @@ async function startRealPayment() {
 
             closeModal("paymentModal");
 
-            alert("You already own this book. Reloading your chapters...");
+            solToast("You already own this book. Reloading your chapters...");
 
-            window.location.reload();
+            setTimeout(() => window.location.reload(), 1200);
 
             return;
         }
@@ -2522,7 +2569,7 @@ async function startRealPayment() {
 
             console.error("No checkout URL returned:", data);
 
-            alert("Payment checkout URL was not returned.");
+            solToast("Payment checkout URL was not returned.");
 
             button.disabled = false;
 
@@ -2530,6 +2577,21 @@ async function startRealPayment() {
 
             return;
         }
+
+        /*
+         * Remember what is being bought so we can unlock it
+         * and jump straight to it after PayMongo sends the reader back.
+         */
+
+        try {
+
+            sessionStorage.setItem("sol-pending-payment", JSON.stringify({
+                chapterId: pendingChapter.id,
+                chapterNumber: pendingChapter.chapter_number,
+                bookId: currentBook?.id || null
+            }));
+
+        } catch (e) {}
 
         /*
          * Redirect to PayMongo.
@@ -2541,7 +2603,7 @@ async function startRealPayment() {
 
         console.error("Payment error:", error);
 
-        alert("Something went wrong while creating the payment.");
+        solToast("Something went wrong while creating the payment.");
 
         button.disabled = false;
 
@@ -2553,61 +2615,120 @@ async function startRealPayment() {
    HANDLE PAYMENT RETURN
 ========================================================= */
 
-async function handlePaymentReturn() {
+let paymentReturn = null;
+
+function handlePaymentReturn() {
 
     const urlParams = new URLSearchParams(window.location.search);
 
     const paymentStatus = urlParams.get("payment");
 
-    const chapterId = urlParams.get("chapter");
+    const urlChapterId = urlParams.get("chapter");
 
-    if (paymentStatus === "success") {
+    if (paymentStatus !== "success" && paymentStatus !== "cancelled") return;
 
-        /*
-         * IMPORTANT:
-         *
-         * DO NOT unlock with localStorage.
-         *
-         * The webhook must mark the purchase
-         * as "paid" in Supabase.
-         */
+    /* Remove payment parameters from the address bar. */
 
-        alert("Payment completed. Your full access is being verified.");
+    window.history.replaceState({}, document.title, window.location.pathname);
 
-        /*
-         * Remove payment parameters.
-         */
+    if (paymentStatus === "cancelled") {
 
-        window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
-        );
+        try { sessionStorage.removeItem("sol-pending-payment"); } catch (e) {}
 
-        /*
-         * Save chapter ID temporarily in sessionStorage
-         * only for navigation after the redirect.
-         *
-         * This is NOT an unlock mechanism.
-         */
-
-        if (chapterId) {
-
-            sessionStorage.setItem("payment-return-chapter", chapterId);
-        }
+        solToast("Payment was cancelled.");
 
         return;
     }
 
-    if (paymentStatus === "cancelled") {
+    /*
+     * IMPORTANT: this is NOT an unlock. The webhook marks the purchase
+     * as "paid" in Supabase; we only wait for it (see verifyPaymentAndUnlock).
+     */
 
-        alert("Payment was cancelled.");
+    let pending = {};
 
-        window.history.replaceState(
-            {},
-            document.title,
-            window.location.pathname
+    try {
+        pending = JSON.parse(sessionStorage.getItem("sol-pending-payment") || "{}");
+        sessionStorage.removeItem("sol-pending-payment");
+    } catch (e) {}
+
+    paymentReturn = {
+        chapterId: pending.chapterId || urlChapterId || null,
+        chapterNumber: pending.chapterNumber || 1,
+        bookId: pending.bookId || null
+    };
+}
+
+async function hasPaidPurchase(ret) {
+
+    if (!currentUser || !isUuid(ret.chapterId)) return false;
+
+    const filter = isUuid(ret.bookId)
+        ? `chapter_id.eq.${ret.chapterId},and(book_id.eq.${ret.bookId},purchase_type.eq.book)`
+        : `chapter_id.eq.${ret.chapterId}`;
+
+    const { data, error } = await supabaseClient
+        .from("purchases")
+        .select("id")
+        .eq("user_id", currentUser.id)
+        .eq("payment_status", "paid")
+        .or(filter)
+        .limit(1)
+        .maybeSingle();
+
+    if (error) {
+        console.error("Payment check failed:", error);
+        return false;
+    }
+
+    return !!data;
+}
+
+/* The webhook can arrive a few seconds after the redirect, so check
+   every 2 seconds for up to 30 seconds before giving up. */
+async function verifyPaymentAndUnlock(ret) {
+
+    if (!currentUser) {
+
+        solToast("Please log in to finish unlocking your purchase.");
+
+        openModal("loginModal");
+
+        return;
+    }
+
+    const hide = solToast("Payment received. Confirming your purchase...", { sticky: true });
+
+    let paid = false;
+
+    for (let attempt = 0; attempt < 15 && !paid; attempt++) {
+
+        try { paid = await hasPaidPurchase(ret); } catch (e) { console.error(e); }
+
+        if (!paid) await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+
+    hide();
+
+    if (!paid) {
+
+        solToast(
+            "Still confirming your payment. Refresh in a minute. " +
+            "If it stays locked, please contact us.",
+            { duration: 9000 }
         );
+
+        return;
+    }
+
+    solToast("Unlocked! Enjoy the story.");
+
+    const book = books.find(b => b.id === ret.bookId);
+
+    if (book) {
+        await openReader(book.id, ret.chapterNumber);
+    } else if (currentBook) {
+        await refreshUnlockedState();
     }
 }
 
@@ -2634,12 +2755,13 @@ function startViewTimer(chapter) {
     viewTimer = setTimeout(
         async () => {
 
-            if (currentBook) {
+            if (currentBook && currentUser) {
 
                 await incrementViews(currentBook.id);
-            }
 
-            localStorage.setItem(key, "true");
+                /* only a cache so we skip pointless calls; the server decides */
+                localStorage.setItem(key, "true");
+            }
         },
         30000
     );
@@ -2651,26 +2773,35 @@ function startViewTimer(chapter) {
 
 async function incrementViews(bookId) {
 
+    /* Views are counted once per logged-in reader, enforced by the
+       increment_views() function in Supabase (see sql/01_votes_views.sql). */
+    if (!currentUser) return;
+
     try {
 
         const book = books.find(b => b.id === bookId);
 
         if (!book) return;
 
-        book.views = (Number(book.views) || 2000000) + 1;
-
-        applySort(currentSort);
-
-        updateReaderStats(book);
-
-        const { error } = await supabaseClient
-            .from("books")
-            .update({ views: book.views })
-            .eq("id", bookId);
+        const { data, error } = await supabaseClient.rpc(
+            "increment_views",
+            { p_book_id: bookId }
+        );
 
         if (error) {
 
             console.error("View increment error:", error);
+
+            return;
+        }
+
+        if (data !== null && data !== undefined) {
+
+            book.views = Number(data) || 0;
+
+            applySort(currentSort);
+
+            updateReaderStats(book);
         }
 
     } catch (err) {
@@ -2683,68 +2814,120 @@ async function incrementViews(bookId) {
    VOTE BOOK
 ========================================================= */
 
+function votedKey(bookId) {
+    return `voted-book-${currentUser ? currentUser.id : "anon"}-${bookId}`;
+}
+
+function markVoteButtonVoted(btn, btnText) {
+
+    if (btn) {
+        btn.classList.add("voted");
+        btn.disabled = true;
+    }
+
+    if (btnText) btnText.textContent = "Voted";
+}
+
+/* Ask the server whether THIS account already voted (works on any device). */
+async function syncVoteState(bookId) {
+
+    if (!currentUser) return;
+
+    try {
+
+        const { data, error } = await supabaseClient
+            .from("book_votes")
+            .select("book_id")
+            .eq("book_id", bookId)
+            .eq("user_id", currentUser.id)
+            .maybeSingle();
+
+        if (error) {
+            console.error("Vote check failed:", error);
+            return;
+        }
+
+        if (data) {
+            try { localStorage.setItem(votedKey(bookId), "true"); } catch (e) {}
+            markVoteButtonVoted($("voteButton"), $("voteButtonText"));
+        }
+
+    } catch (err) {
+
+        console.error("Vote check error:", err);
+    }
+}
+
 async function voteBook(bookId) {
 
-    const key = `voted-book-${bookId}`;
+    if (!currentUser) {
 
-    if (localStorage.getItem(key) === "true") {
+        solToast("Please log in to vote.");
+
+        openModal("loginModal");
 
         return;
     }
 
+    const book = books.find(b => b.id === bookId);
+
+    if (!book) return;
+
+    const btn = $("voteButton");
+    const btnText = $("voteButtonText");
+
+    if (btn) btn.disabled = true;
+
     try {
 
-        const book = books.find(b => b.id === bookId);
+        const { data, error } = await supabaseClient.rpc(
+            "cast_vote",
+            { p_book_id: bookId }
+        );
 
-        if (!book) return;
+        if (error) {
 
-        book.votes = (Number(book.votes) || 100000) + 1;
+            console.error("Vote error:", error);
 
-        localStorage.setItem(key, "true");
+            solToast("Couldn't register your vote. Please try again.");
+
+            if (btn) btn.disabled = false;
+
+            return;
+        }
+
+        const result = data || {};
+
+        if (result.votes !== undefined && result.votes !== null) {
+            book.votes = Number(result.votes) || 0;
+        }
+
+        try { localStorage.setItem(votedKey(bookId), "true"); } catch (e) {}
 
         const countEl = $("modalVoteCount");
-        const btn = $("voteButton");
-        const btnText = $("voteButtonText");
 
         if (countEl) {
-
-            countEl.textContent = Number(book.votes).toLocaleString();
+            countEl.textContent = (Number(book.votes) || 0).toLocaleString();
         }
 
-        if (btn) {
+        markVoteButtonVoted(btn, btnText);
 
-            btn.classList.add("voted", "just-voted");
+        if (btn && !result.already_voted) {
 
-            btn.disabled = true;
+            btn.classList.add("just-voted");
 
-            setTimeout(
-                () => btn.classList.remove("just-voted"),
-                700
-            );
-        }
-
-        if (btnText) {
-
-            btnText.textContent = "Voted";
+            setTimeout(() => btn.classList.remove("just-voted"), 700);
         }
 
         applySort(currentSort);
 
         updateReaderStats(book);
 
-        const { error } = await supabaseClient
-            .from("books")
-            .update({ votes: book.votes })
-            .eq("id", bookId);
-
-        if (error) {
-
-            console.error("Vote error:", error);
-        }
-
     } catch (err) {
 
         console.error("Failed to vote:", err);
+
+        if (btn) btn.disabled = false;
     }
 }
 
