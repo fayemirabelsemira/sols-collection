@@ -22,6 +22,33 @@ const supabaseClient = window.supabase.createClient(
     SUPABASE_ANON_KEY
 );
 
+/* The reset-password email link makes Supabase announce "PASSWORD_RECOVERY"
+   while the page is still loading, BEFORE checkUser() runs. So we listen
+   from the very first moment, and also notice the link itself in the URL. */
+let recoveryRequested = /[#&?]type=recovery/.test(
+    window.location.hash + window.location.search
+);
+
+supabaseClient.auth.onAuthStateChange((event) => {
+
+    if (event === "PASSWORD_RECOVERY") {
+
+        recoveryRequested = true;
+
+        if (document.readyState !== "loading") showResetPasswordModal();
+    }
+});
+
+function showResetPasswordModal() {
+
+    recoveryRequested = false;
+
+    closeModal("loginModal");
+    closeModal("signupModal");
+    closeModal("forgotModal");
+    openModal("resetModal");
+}
+
 /* =========================================================
    GLOBAL STATE
 ========================================================= */
@@ -89,6 +116,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     setupNavigation();
     setupModals();
     setupAuthentication();
+
+    if (recoveryRequested) showResetPasswordModal();
     setupReaderControls();
     setupReaderExtras();
     setupGenreButtons();
@@ -319,13 +348,7 @@ async function checkUser() {
         async (_event, session) => {
 
             /* the reset-password email link lands here */
-            if (_event === "PASSWORD_RECOVERY") {
-
-                closeModal("loginModal");
-                closeModal("signupModal");
-                closeModal("forgotModal");
-                openModal("resetModal");
-            }
+            if (_event === "PASSWORD_RECOVERY") showResetPasswordModal();
 
             currentUser = session?.user || null;
 
@@ -473,7 +496,9 @@ async function requestPasswordReset(event) {
 
         if (error && error.status === 429) {
 
-            solToast("Please wait a minute before asking for another email.");
+            solToast("We've sent too many emails for now. Please wait a while (up to an hour) and try again.", { duration: 8000 });
+
+            cooldownButton($("forgotSubmit"), 120);
 
             return;
         }
@@ -516,7 +541,9 @@ async function resendConfirmation() {
 
         if (error && error.status === 429) {
 
-            solToast("Please wait a minute before asking for another email.");
+            solToast("We've sent too many emails for now. Please wait a while (up to an hour) and try again.", { duration: 8000 });
+
+            cooldownButton($("resendConfirmButton"), 120);
 
             return;
         }
@@ -3548,6 +3575,8 @@ function setupReaderExtras() {
    READER BRIDGE (used by js/bookmarks.js)
    Exposes just what the bookmark feature needs.
 ========================================================= */
+
+window.loadBooks = loadBooks;
 
 window.SolReader = {
     state: () => ({
