@@ -2649,6 +2649,19 @@ function renderContinue(state) {
     if ($("progressNumbers")) $("progressNumbers").textContent = `${chapterNumber} / ${total}`;
     if ($("continueProgress")) $("continueProgress").style.width = `${percent}%`;
 
+    const coverEl = $("continueCover");
+
+    if (coverEl) {
+        if (book && book.cover_url) {
+            coverEl.classList.add("has-cover");
+            coverEl.innerHTML =
+                `<img src="${escapeHtml(book.cover_url)}" alt="${escapeHtml(book.title)}" loading="lazy" decoding="async">`;
+        } else {
+            coverEl.classList.remove("has-cover");
+            coverEl.innerHTML = "<span>SC</span>";
+        }
+    }
+
     const button = $("continueButton");
 
     if (button) {
@@ -3575,8 +3588,6 @@ function setupReaderExtras() {
    READER BRIDGE (used by js/bookmarks.js)
    Exposes just what the bookmark feature needs.
 ========================================================= */
-
-window.loadBooks = loadBooks;
 
 window.SolReader = {
     state: () => ({
