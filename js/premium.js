@@ -242,7 +242,7 @@
       });
     }
     const about = $("#about");
-    if (about) gsap.from(about, { opacity: 0, y: 90, scale: 0.96, duration: 1.4, ease: "power4.out", scrollTrigger: { trigger: about, start: "top 88%", once: true } });
+    /* homepage profile (#about) shows without a reveal animation */
   }
 
   // Genre spotlight follows the pointer
@@ -336,6 +336,7 @@
   document.addEventListener("pointerdown", (e) => { lastPt = { x: e.clientX, y: e.clientY }; }, true);
 
   function openModal(m) {
+    if (m.id === "bookModal") return;   /* book profile opens instantly, no animation */
     const box = $(".modal-box", m) || $(".author-box", m);
     const ov = $(".modal-overlay", m);
     if (ov) gsap.fromTo(ov, { opacity: 0 }, { opacity: 1, duration: 0.55, ease: "power2.out", clearProps: "opacity" });

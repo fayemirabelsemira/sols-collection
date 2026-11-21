@@ -212,3 +212,7 @@ html.has-gsap .modal-box{animation:none}
 /* ---------- One font everywhere (reader included) ---------- */
 .story-content,#storyContent,#readerContent{font-family:var(--font-ui)!important}
 .font-select,#fontFamily{display:none!important}
+
+/* no animations on the book profile and the homepage author profile */
+#bookModal,#bookModal *,#bookModal *::before,#bookModal *::after,
+#about,#about *,#about *::before,#about *::after{animation:none!important;transition:none!important}
