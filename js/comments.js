@@ -1,5 +1,5 @@
 /* =========================================================
-   Sol's Collection: chapter comments (replies, likes, delete)
+   Sol: chapter comments (replies, likes, delete)
    Needs: supabase-comments.sql run once in Supabase.
    Uses the existing supabaseClient, currentUser and openModal
    from script.js (this file loads after it).
@@ -40,6 +40,7 @@
     }
     var ICON_HEART = icon('<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>');
     var ICON_REPLY = icon('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/>');
+    var ICON_BUBBLE = icon('<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/>');
     var ICON_TRASH = icon('<path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>');
 
     /* ---------- helpers ---------- */
@@ -109,29 +110,41 @@
     /* ---------- composer (top-level box and reply boxes) ---------- */
     function buildComposer(parentId, prefill, onCancel) {
         var box = document.createElement("div");
-        box.className = "comment-form";
+        var fid = "cmt-" + Math.random().toString(36).slice(2, 9);
+        var label = parentId ? "Your reply" : "Add a comment";
+        box.className = "comment-form" + (parentId ? " is-reply" : "");
         box.innerHTML =
-            '<textarea class="comment-input" maxlength="' + MAX_LEN + '" rows="' + (parentId ? 2 : 3) + '" ' +
-            'placeholder="' + (parentId ? "Write a reply..." : "Share your thoughts on this chapter...") + '"></textarea>' +
+            '<label class="comment-label" for="' + fid + '">' + label + "</label>" +
+            '<div class="comment-field">' +
+            '<textarea id="' + fid + '" class="comment-input" maxlength="' + MAX_LEN + '" rows="' + (parentId ? 2 : 3) + '" ' +
+            'placeholder="' + (parentId ? "Write a reply" : "What did you think of this chapter?") + '"></textarea>' +
             '<div class="comment-form-row">' +
-            '<span class="comment-counter">0/' + MAX_LEN + "</span>" +
-            '<span class="comment-error" role="alert"></span>' +
+            '<span class="comment-counter" aria-live="polite"></span>' +
             '<div class="comment-form-buttons">' +
             (parentId ? '<button type="button" class="comment-cancel">Cancel</button>' : "") +
-            '<button type="button" class="comment-post">' + (parentId ? "Reply" : "Post Comment") + "</button>" +
-            "</div></div>";
+            '<button type="button" class="comment-post" disabled>' + (parentId ? "Reply" : "Post") + "</button>" +
+            "</div></div></div>" +
+            '<p class="comment-error" role="alert"></p>';
 
         var ta = box.querySelector(".comment-input");
         var counter = box.querySelector(".comment-counter");
         var errEl = box.querySelector(".comment-error");
         var postBtn = box.querySelector(".comment-post");
         var cancelBtn = box.querySelector(".comment-cancel");
+        var postLabel = postBtn.textContent;
+
+        /* the counter only appears when it matters (near the limit) */
+        function syncForm() {
+            var n = ta.value.length;
+            counter.textContent = n >= MAX_LEN * 0.8 ? (MAX_LEN - n) + " characters left" : "";
+            postBtn.disabled = !ta.value.trim();
+        }
 
         if (prefill) ta.value = prefill;
-        counter.textContent = ta.value.length + "/" + MAX_LEN;
+        syncForm();
 
         ta.addEventListener("input", function () {
-            counter.textContent = ta.value.length + "/" + MAX_LEN;
+            syncForm();
             errEl.textContent = "";
         });
 
@@ -156,6 +169,8 @@
             }
 
             postBtn.disabled = true;
+            postBtn.textContent = "Posting…";
+            box.setAttribute("aria-busy", "true");
             errEl.textContent = "";
 
             var res = await sb.from("comments")
@@ -168,18 +183,21 @@
                 .select()
                 .single();
 
-            postBtn.disabled = false;
+            postBtn.textContent = postLabel;
+            box.removeAttribute("aria-busy");
 
             if (res.error) {
                 console.error("Comment error:", res.error);
                 errEl.textContent = friendlyError(res.error);
+                syncForm();
                 return;
             }
 
             ta.value = "";
-            counter.textContent = "0/" + MAX_LEN;
+            syncForm();
 
             addNewComment(res.data);
+            document.dispatchEvent(new CustomEvent("sol:commented", { detail: { bookId: String(state.bookId) } }));
 
             if (parentId && onCancel) onCancel();
         }
@@ -193,7 +211,7 @@
         if (!me()) {
             composerEl.innerHTML =
                 '<div class="comment-login">' +
-                "<span>Log in to join the discussion.</span>" +
+                '<p><strong>Join the conversation</strong><span>Log in to comment on this chapter.</span></p>' +
                 '<button type="button" class="comment-post" data-action="login">Log in</button>' +
                 "</div>";
             return;
@@ -203,6 +221,37 @@
     }
 
     /* ---------- one comment ---------- */
+    /* spoiler-safe: the writer had read further than this reader */
+    function bodyHTML(c) {
+        var A = window.SolApp;
+        var mine = me() && c.user_id === me().id;
+        if (!mine && A && A.aheadOf && A.aheadOf(state.bookId, c.reader_chapter)) {
+            return '<p class="comment-body sol-ahead" data-reveal tabindex="0" role="button" aria-label="Possible spoiler. Tap to show.">' +
+                '<span class="sol-ahead-note">Possible spoiler · written by a reader at ' + esc(chapterName(c.reader_chapter)) + '. Tap to show.</span>' +
+                '<span class="sol-ahead-text">' + esc(c.body) + "</span></p>";
+        }
+        return '<p class="comment-body">' + esc(c.body) + "</p>";
+    }
+
+    document.addEventListener("click", function (e) {
+        var el = e.target.closest && e.target.closest(".comment-body.sol-ahead");
+        if (!el) return;
+        el.classList.remove("sol-ahead");
+        el.removeAttribute("data-reveal");
+        el.removeAttribute("role");
+        el.removeAttribute("tabindex");
+    });
+    document.addEventListener("keydown", function (e) {
+        var el = e.target.closest && e.target.closest(".comment-body.sol-ahead");
+        if (el && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); el.click(); }
+    });
+
+    function chapterName(n) {
+        var list = typeof currentChapters !== "undefined" ? currentChapters : [];
+        var ch = list.find(function (x) { return Number(x.chapter_number) === Number(n); });
+        return ch && window.solChapterLabel ? window.solChapterLabel(ch) : "Chapter " + n;
+    }
+
     function commentHTML(c, isReply) {
         var user = me();
         var liked = state.likedIds.has(c.id);
@@ -218,7 +267,7 @@
             '<strong class="comment-author">' + esc(name) + "</strong>" +
             '<time datetime="' + esc(c.created_at) + '" title="' + esc(new Date(c.created_at).toLocaleString()) + '">' + esc(timeAgo(c.created_at)) + "</time>" +
             "</div>" +
-            '<p class="comment-body">' + esc(c.body) + "</p>" +
+            bodyHTML(c) +
             '<div class="comment-actions">' +
             '<button type="button" class="comment-action comment-like' + (liked ? " liked" : "") + '" data-action="like" aria-pressed="' + liked + '" aria-label="Like">' +
             ICON_HEART + '<span class="like-count">' + (c.like_count || 0) + "</span></button>" +
@@ -263,7 +312,10 @@
     function showEmptyIfNeeded() {
         if (listEl.querySelector(".comment")) return;
         if (listEl.querySelector(".comments-empty")) return;
-        listEl.innerHTML = '<p class="comments-empty">No comments yet. Be the first to share your thoughts.</p>';
+        listEl.innerHTML =
+            '<div class="comments-empty is-blank">' + ICON_BUBBLE +
+            '<p class="comments-empty-title">No comments yet</p>' +
+            '<p class="comments-empty-sub">Start the conversation about this chapter.</p></div>';
     }
 
     function addNewComment(c) {
@@ -389,7 +441,7 @@
         state.offset = 0;
         state.likedIds = new Set();
 
-        listEl.innerHTML = '<p class="comments-empty">Loading comments...</p>';
+        listEl.innerHTML = '<p class="comments-empty is-loading" aria-busy="true">Loading comments\u2026</p>';
         moreBtn.classList.add("hidden");
 
         await checkAdmin();

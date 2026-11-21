@@ -41,8 +41,8 @@ export default {
     let book = null;
     try { book = await findBook(decodeURIComponent(m[1])); } catch (e) {}
 
-    const title = book ? `${book.title} | Sol's Collection` : "Sol's Collection";
-    const desc = book ? String(book.description || "Read it on Sol's Collection.").replace(/\s+/g, " ").slice(0, 160) : "Stories that stay with you.";
+    const title = book ? `${book.title} | Sol` : "Sol";
+    const desc = book ? String(book.description || "Read it on Sol.").replace(/\s+/g, " ").slice(0, 160) : "Stories that stay with you.";
     const image = book && book.cover_url ? book.cover_url : "";
 
     const setContent = value => ({ element(el) { el.setAttribute("content", value); } });
@@ -53,8 +53,8 @@ export default {
 
     return new HTMLRewriter()
       .on("title", { element(el) { el.setInnerContent(title); } })
-      .on('meta[property="og:title"]', setContent(book ? book.title : "Sol's Collection"))
-      .on('meta[name="twitter:title"]', setContent(book ? book.title : "Sol's Collection"))
+      .on('meta[property="og:title"]', setContent(book ? book.title : "Sol"))
+      .on('meta[name="twitter:title"]', setContent(book ? book.title : "Sol"))
       .on('meta[property="og:description"]', setContent(desc))
       .on('meta[name="twitter:description"]', setContent(desc))
       .on('meta[name="twitter:card"]', setContent(image ? "summary_large_image" : "summary"))

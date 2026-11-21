@@ -1,4 +1,4 @@
-/* Sol's Collection — mobile polish (phones only, ≤700px).
+/* Sol — mobile polish (phones only, ≤700px).
    Load AFTER premium.js. Needs GSAP + ScrollTrigger (already on the page);
    everything degrades gracefully if they are missing. */
 (() => {

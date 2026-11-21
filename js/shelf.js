@@ -1,4 +1,4 @@
-/* Sol's Collection — Reading Journey shelf.
+/* Sol — Reading Journey shelf.
    Adds a row of "other stories you've opened" under the Continue Reading card.
    Load AFTER script.js:  <script src="js/shelf.js"></script>
    It reads script.js's own globals (books, currentUser, readLocalPositions, openReader...)
@@ -13,7 +13,7 @@
   css.textContent = `
 .journey-shelf{max-width:450px;margin:22px auto 0}
 .journey-shelf[hidden]{display:none}
-.shelf-title{margin:0 0 12px;padding:0 2px;font:italic 500 20px/1.2 var(--font-display,"Bodoni Moda",Georgia,serif);color:var(--ivory,#f4ede4)}
+.shelf-title{margin:0 0 12px;padding:0 2px;font:italic 500 20px/1.2 var(--font-ui,Inter,sans-serif);color:var(--ivory,#f4ede4)}
 .shelf-track{display:flex;gap:12px;margin:0;padding:2px 2px 10px;list-style:none;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .shelf-track::-webkit-scrollbar{display:none}
 .shelf-track li{flex:0 0 220px;scroll-snap-align:start}
@@ -24,10 +24,10 @@
 .shelf-card:active{scale:.97}
 .shelf-card:focus-visible{outline:2px solid var(--ember,#ff6a4d);outline-offset:2px}
 .shelf-cover{flex:0 0 52px;height:78px;border-radius:8px;overflow:hidden;display:grid;place-items:center;
-  background:radial-gradient(circle,#e0274f 0%,#3a0716 60%,#070508 100%);color:var(--ember-hi,#ffb199);font:700 20px var(--font-display,Georgia,serif)}
+  background:radial-gradient(circle,#e0274f 0%,#3a0716 60%,#070508 100%);color:var(--ember-hi,#ffb199);font:700 20px var(--font-ui,Inter,sans-serif)}
 .shelf-cover img{display:block;width:100%;height:100%;object-fit:cover}
 .shelf-info{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:4px}
-.shelf-name{font:500 15px/1.2 var(--font-serif,Georgia,serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.shelf-name{font:500 15px/1.2 var(--font-ui,Inter,sans-serif);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .shelf-meta{font-size:12px;color:var(--muted,#b3a8a6)}
 .shelf-bar{height:3px;margin-top:2px;border-radius:3px;overflow:hidden;background:rgba(255,255,255,.08)}
 .shelf-bar i{display:block;height:100%;background:var(--brushed,linear-gradient(120deg,#ff3d5e,#ffb347));box-shadow:0 0 10px rgba(255,106,77,.5)}

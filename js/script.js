@@ -1,5 +1,5 @@
 /* =========================================================
-   SOL'S COLLECTION
+   SOL
    FULL VERSION
    - Views
    - Votes
@@ -95,6 +95,27 @@ function getBookPrice(book) {
     const price = Number(book?.price);
     return Number.isFinite(price) && price > 0 ? price : DEFAULT_BOOK_PRICE;
 }
+
+/* Named parts of a book (Prologue, Epilogue, ...) are shown by their name
+   instead of "Chapter N", everywhere a chapter is labelled. */
+const NAMED_PART_RE = /^(prologue|epilogue|interlude|afterword|foreword|preface|special chapter|bonus chapter|extra chapter|side story|author'?s note)\b/i;
+
+function isNamedPart(chapter) {
+    return NAMED_PART_RE.test(String(chapter?.title || "").trim());
+}
+
+/* short label: "Chapter 12" or "Epilogue" */
+function chapterLabel(chapter) {
+    return isNamedPart(chapter) ? String(chapter.title).trim() : `Chapter ${chapter?.chapter_number}`;
+}
+
+/* long label: "Chapter 12: The Oath", "Chapter 12" or "Epilogue" */
+function chapterFullTitle(chapter) {
+    const t = String(chapter?.title || "").trim();
+    if (isNamedPart(chapter) || isDefaultChapterTitle(t, chapter?.chapter_number)) return chapterLabel(chapter);
+    return `Chapter ${chapter.chapter_number}: ${t}`;
+}
+window.solChapterLabel = chapterLabel;
 
 /* True when a title is empty or just repeats "Chapter N" */
 function isDefaultChapterTitle(title, chapterNumber) {
@@ -322,7 +343,15 @@ async function checkUser() {
 
         const { data, error } = await supabaseClient.auth.getUser();
 
-        if (error) {
+        if (error && !navigator.onLine) {
+
+            /* Offline: the server can't confirm the login, so keep the
+               session saved on this device (saved stories stay readable). */
+            const { data: s } = await supabaseClient.auth.getSession();
+
+            currentUser = s?.session?.user || null;
+
+        } else if (error) {
 
             console.error("Auth error:", error);
 
@@ -344,8 +373,14 @@ async function checkUser() {
         updateAuthUI();
     }
 
+    /* IMPORTANT: Supabase holds its internal auth lock while this callback
+       runs. Any Supabase request made (or awaited) INSIDE it waits for that
+       same lock and never finishes - every later request (like saving a
+       chapter in Writer Studio) then hangs forever. So only do cheap,
+       synchronous work here and run everything that talks to Supabase
+       after the callback has returned (setTimeout). */
     supabaseClient.auth.onAuthStateChange(
-        async (_event, session) => {
+        (_event, session) => {
 
             /* the reset-password email link lands here */
             if (_event === "PASSWORD_RECOVERY") showResetPasswordModal();
@@ -354,13 +389,17 @@ async function checkUser() {
 
             updateAuthUI();
 
-            if (window.SolBookmarks) window.SolBookmarks.onAuth(currentUser);
+            setTimeout(() => {
 
-            if (currentBook) {
-                refreshUnlockedState();
-            }
+                if (window.SolBookmarks) window.SolBookmarks.onAuth(currentUser);
 
-            await loadContinueReading();
+                if (currentBook) {
+                    refreshUnlockedState();
+                }
+
+                loadContinueReading();
+
+            }, 0);
         }
     );
 }
@@ -966,7 +1005,7 @@ function renderBooks(list = books) {
               `
             : `
                 <div class="cover-fallback">
-                    <span>SC</span>
+                    <span>S</span>
                 </div>
               `;
 
@@ -1090,7 +1129,8 @@ async function showBook(bookId) {
     const priceEl = $("modalBookPrice");
 
     if (priceEl) {
-        priceEl.textContent = "₱" + getBookPrice(book);
+        /* books by other writers are free (price 0) */
+        priceEl.textContent = Number(book.price) === 0 && book.price !== null ? "Free" : "₱" + getBookPrice(book);
     }
 
     const views = (Number(book.views) || 0).toLocaleString();
@@ -1175,7 +1215,7 @@ async function showBook(bookId) {
             cover.innerHTML = `
 
                 <div class="cover-fallback">
-                    <span>SC</span>
+                    <span>S</span>
                 </div>
 
             `;
@@ -1421,7 +1461,9 @@ async function loadChapterList() {
             /* Hide the title when it only repeats "Chapter N" */
             const rawTitle = (chapter.title || "").trim();
 
-            const hideTitle = isDefaultChapterTitle(
+            /* Epilogue etc.: the name replaces "Chapter N", no second line */
+            const named = isNamedPart(chapter);
+            const hideTitle = named || isDefaultChapterTitle(
                 rawTitle,
                 chapter.chapter_number
             );
@@ -1429,7 +1471,7 @@ async function loadChapterList() {
             item.innerHTML = `
 
                 <span class="chapter-number">
-                    Chapter ${chapter.chapter_number}
+                    ${escapeHtml(chapterLabel(chapter))}
                 </span>
 
                 ${
@@ -1769,6 +1811,112 @@ function sanitizeChapterHtml(html) {
     return doc.body.innerHTML;
 }
 
+/* ---------- POV headings and scene breaks ----------
+   A line that is only  "Name's POV" / "Third Person's POV" / "Name SecondName's POV"
+   gets class "pov-line", and a line that is only  ***  gets class "scene-break",
+   so the reader can style them. The text itself is never changed, so saved
+   reading positions, bookmarks and highlights keep lining up. */
+
+const POV_LINE_RE = /^\s*\*{0,3}\s*[\p{L}\p{M}][\p{L}\p{M}.'\u2019-]*(?:\s+[\p{L}\p{M}][\p{L}\p{M}.'\u2019-]*){0,5}?['\u2019]s?\s+(?:POV|P\.O\.V\.?|point\s+of\s+view)\s*\.?\s*\*{0,3}\s*$/iu;
+const SCENE_BREAK_RE = /^\s*(?:\*\s*){3,}$/;
+const CHAPTER_LINE_HINT = /p\.?o\.?v|point\s+of\s+view|\*\s*\*\s*\*/i;
+const INLINE_WRAP_TAG = /^(STRONG|EM|B|I|U|S|SPAN|A|SUB|SUP|FONT)$/;
+const BLOCK_SIBLING_TAG = /^(BR|DIV|P|H[1-6]|BLOCKQUOTE|UL|OL|LI|HR|IMG)$/;
+
+/* is this text node at the very start (or end) of a line of the chapter? */
+function chapterLineEdge(node, forward) {
+
+    let cur = node;
+
+    while (cur) {
+
+        const sib = forward ? cur.nextSibling : cur.previousSibling;
+
+        if (sib) {
+
+            if (sib.nodeType === 1 && BLOCK_SIBLING_TAG.test(sib.tagName)) return true;
+
+            const t = sib.textContent || "";
+
+            if (t.length) return forward ? /^[ \t\r]*\n/.test(t) : /\n[ \t\r]*$/.test(t);
+
+            cur = sib;
+            continue;
+        }
+
+        const parent = cur.parentNode;
+
+        if (!parent || parent.nodeType !== 1 || !INLINE_WRAP_TAG.test(parent.tagName)) return true;
+
+        cur = parent;
+    }
+
+    return true;
+}
+
+function markChapterLines(root) {
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    const nodes = [];
+    let n;
+
+    while ((n = walker.nextNode())) nodes.push(n);
+
+    nodes.forEach(node => {
+
+        const text = node.nodeValue;
+
+        if (!text || !CHAPTER_LINE_HINT.test(text)) return;
+
+        const parent = node.parentElement;
+        if (parent && /^(SCRIPT|STYLE|CODE|PRE)$/i.test(parent.tagName)) return;
+
+        const parts = text.split("\n");
+        const frag = document.createDocumentFragment();
+        let buffer = "";
+        let changed = false;
+
+        parts.forEach((line, i) => {
+
+            const lineStart = i > 0 || chapterLineEdge(node, false);
+            const lineEnd = i < parts.length - 1 || chapterLineEdge(node, true);
+
+            let cls = "";
+
+            if (lineStart && lineEnd && line.length <= 90) {
+
+                if (SCENE_BREAK_RE.test(line)) cls = "scene-break";
+                else if (POV_LINE_RE.test(line)) cls = "pov-line";
+            }
+
+            if (cls) {
+
+                if (buffer) frag.appendChild(document.createTextNode(buffer));
+                buffer = "";
+
+                const span = document.createElement("span");
+                span.className = cls;
+                span.textContent = line;
+                frag.appendChild(span);
+
+                changed = true;
+
+            } else {
+
+                buffer += line;
+            }
+
+            if (i < parts.length - 1) buffer += "\n";
+        });
+
+        if (!changed) return;
+
+        if (buffer) frag.appendChild(document.createTextNode(buffer));
+
+        node.replaceWith(frag);
+    });
+}
+
 function formatChapterContent(html) {
 
     if (!html) return "";
@@ -1776,6 +1924,8 @@ function formatChapterContent(html) {
     html = sanitizeChapterHtml(html);
 
     const doc = new DOMParser().parseFromString(html, "text/html");
+
+    markChapterLines(doc.body);
 
     const walker = document.createTreeWalker(doc.body, NodeFilter.SHOW_TEXT);
     const textNodes = [];
@@ -1789,9 +1939,10 @@ function formatChapterContent(html) {
 
         if (!text || (text.indexOf("*") === -1 && !/["\u201C]/.test(text))) return;
 
-        /* Skip text inside code / scripts */
+        /* Skip text inside code / scripts, and the *** scene-break line */
         const parent = node.parentElement;
         if (parent && /^(SCRIPT|STYLE|CODE|PRE)$/i.test(parent.tagName)) return;
+        if (parent && parent.classList.contains("scene-break")) return;
 
         let out = text
             .replace(/&/g, "&amp;")
@@ -1810,6 +1961,34 @@ function formatChapterContent(html) {
     });
 
     return doc.body.innerHTML;
+}
+
+/* =========================================================
+   CHAPTER BANNER
+   Faded copy of the book cover at the top of every chapter.
+========================================================= */
+
+function updateChapterBanner() {
+
+    const banner = $("chapterBanner");
+
+    if (!banner) return;
+
+    const url = String((currentBook && currentBook.cover_url) || "").trim();
+
+    /* same rule as the cover images elsewhere: normal web / data images only */
+    if (!/^(https?:\/\/|\/|images\/|data:image\/)/i.test(url)) {
+
+        banner.classList.remove("has-cover");
+        banner.style.removeProperty("--cover");
+        if (banner.parentElement) banner.parentElement.classList.remove("has-banner");
+
+        return;
+    }
+
+    banner.style.setProperty("--cover", "url(" + JSON.stringify(url) + ")");
+    banner.classList.add("has-cover");
+    if (banner.parentElement) banner.parentElement.classList.add("has-banner");
 }
 
 /* =========================================================
@@ -1874,10 +2053,7 @@ async function loadChapterContent(chapter) {
 
             const cleanTitle = (loadedChapter.title || "").trim();
 
-            titleElement.textContent =
-                isDefaultChapterTitle(cleanTitle, loadedChapter.chapter_number)
-                    ? `Chapter ${loadedChapter.chapter_number}`
-                    : `Chapter ${loadedChapter.chapter_number}: ${cleanTitle}`;
+            titleElement.textContent = chapterFullTitle(loadedChapter);
         }
 
         /* =================================================
@@ -1888,14 +2064,14 @@ async function loadChapterContent(chapter) {
 
         if (heading) {
 
-            heading.textContent = `Chapter ${loadedChapter.chapter_number}`;
+            heading.textContent = chapterLabel(loadedChapter);
         }
 
         const numberElement = $("readerChapterNumber");
 
         if (numberElement) {
 
-            numberElement.textContent = `Chapter ${loadedChapter.chapter_number}`;
+            numberElement.textContent = chapterLabel(loadedChapter);
         }
 
         /* =================================================
@@ -1908,6 +2084,8 @@ async function loadChapterContent(chapter) {
 
             contentElement.innerHTML = formatChapterContent(loadedChapter.content || "");
         }
+
+        updateChapterBanner();
 
         /* Always start a new chapter at the top */
         scrollReaderToTop();
@@ -1988,16 +2166,16 @@ function renderChapter(chapter) {
     }
 
     if ($("chapterHeading")) {
-        $("chapterHeading").textContent = `Chapter ${chapter.chapter_number}`;
+        $("chapterHeading").textContent = chapterLabel(chapter);
     }
 
     if ($("readerChapterTitle")) {
         $("readerChapterTitle").textContent =
-            chapter.title || `Chapter ${chapter.chapter_number}`;
+            chapterFullTitle(chapter);
     }
 
     if ($("readerChapterNumber")) {
-        $("readerChapterNumber").textContent = `Chapter ${chapter.chapter_number}`;
+        $("readerChapterNumber").textContent = chapterLabel(chapter);
     }
 
     const contentElement = $("readerContent") || $("storyContent");
@@ -2005,6 +2183,8 @@ function renderChapter(chapter) {
     if (contentElement) {
         contentElement.innerHTML = formatChapterContent(chapter.content || "");
     }
+
+    updateChapterBanner();
 
     updateReaderProgress(chapter.chapter_number);
 
@@ -2034,13 +2214,28 @@ function updateNavigationButtons() {
     const previous = $("previousChapter");
     const next = $("nextChapter");
 
+    const prevChapter = currentChapters[currentChapterIndex - 1] || null;
+    const nextChapter = currentChapters[currentChapterIndex + 1] || null;
+    const thisChapter = currentChapters[currentChapterIndex] || null;
+
     if (previous) {
-        previous.disabled = currentChapterIndex === 0;
+        previous.disabled = !prevChapter;
+        const kicker = previous.querySelector(".nav-kicker");
+        const title = $("previousChapterTitle");
+        if (kicker) kicker.textContent = prevChapter ? "Previous" : "Start of the book";
+        if (title) title.textContent = prevChapter ? chapterFullTitle(prevChapter) : "";
     }
 
     if (next) {
-        next.disabled = currentChapterIndex >= currentChapters.length - 1;
+        next.disabled = !nextChapter;
+        const kicker = next.querySelector(".nav-kicker");
+        const title = $("nextChapterTitle");
+        if (kicker) kicker.textContent = nextChapter ? "Next chapter" : "You're all caught up";
+        if (title) title.textContent = nextChapter ? chapterFullTitle(nextChapter) : "";
     }
+
+    const mark = $("chapterEndMark");
+    if (mark) mark.textContent = thisChapter ? `End of ${chapterLabel(thisChapter)}` : "End of chapter";
 }
 
 /* =========================================================
@@ -2658,7 +2853,7 @@ function renderContinue(state) {
                 `<img src="${escapeHtml(book.cover_url)}" alt="${escapeHtml(book.title)}" loading="lazy" decoding="async">`;
         } else {
             coverEl.classList.remove("has-cover");
-            coverEl.innerHTML = "<span>SC</span>";
+            coverEl.innerHTML = "<span>S</span>";
         }
     }
 
@@ -2881,6 +3076,14 @@ async function startRealPayment() {
          * Redirect to PayMongo.
          */
 
+        if (!isPayMongoCheckout(data.checkout_url)) {
+            console.error("Unexpected checkout URL:", data.checkout_url);
+            solToast("Payment checkout URL was not valid. Please try again.");
+            button.disabled = false;
+            button.textContent = originalText;
+            return;
+        }
+
         window.location.href = data.checkout_url;
 
     } catch (error) {
@@ -2941,6 +3144,18 @@ function handlePaymentReturn() {
         chapterNumber: pending.chapterNumber || 1,
         bookId: pending.bookId || null
     };
+}
+
+/* The payment page must be PayMongo's own: checkout sessions and sources
+   live on *.paymongo.com, payment links on pm.link. */
+function isPayMongoCheckout(value) {
+    try {
+        const u = new URL(String(value));
+        return u.protocol === "https:" && (u.hostname === "paymongo.com" || u.hostname.endsWith(".paymongo.com") ||
+            u.hostname === "pm.link" || u.hostname.endsWith(".pm.link"));
+    } catch (e) {
+        return false;
+    }
 }
 
 async function hasPaidPurchase(ret) {
@@ -3389,7 +3604,7 @@ async function shareCurrentBook() {
 
     const data = {
         title: currentBook.title,
-        text: `Read "${currentBook.title}" on Sol's Collection`,
+        text: `Read "${currentBook.title}" on Sol`,
         url
     };
 
@@ -3399,12 +3614,16 @@ async function shareCurrentBook() {
 
             await navigator.share(data);
 
+            /* js/rewards.js counts finished shares toward a free chapter */
+            document.dispatchEvent(new CustomEvent("sol:shared", { detail: { bookId: currentBook.id } }));
+
             return;
         }
 
         await navigator.clipboard.writeText(url);
 
-        solToast("Link copied!");
+        /* a copied link isn't proof of a share, so it does not count toward rewards */
+        solToast("Link copied! Use your device's Share button to count toward a free chapter.");
 
     } catch (error) {
 

@@ -1,0 +1,24 @@
+{
+  "id": "/",
+  "name": "Sol",
+  "short_name": "Sol",
+  "description": "Stories that stay with you. Dark romance, revenge and drama by Miss Sol.",
+  "start_url": "/?source=app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#070508",
+  "theme_color": "#070508",
+  "lang": "en",
+  "categories": ["books", "entertainment"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ],
+  "shortcuts": [
+    { "name": "Discussion", "url": "/#/discuss", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "My Library", "url": "/#/library", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

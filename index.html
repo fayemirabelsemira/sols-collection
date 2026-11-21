@@ -3,24 +3,34 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Sol's Collection</title>
+<title>Sol</title>
 <meta name="description" content="Stories that stay with you.">
 <meta name="theme-color" content="#070508">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230d0d0d'/%3E%3Ccircle cx='32' cy='32' r='12' fill='%23d4af37'/%3E%3Cg stroke='%23d4af37' stroke-width='4' stroke-linecap='round'%3E%3Cpath d='M32 8v6M32 50v6M8 32h6M50 32h6M15 15l4 4M45 45l4 4M49 15l-4 4M19 45l-4 4'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="icon" href="/icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="/icons/favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="/icons/icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="application-name" content="Sol">
+<meta name="apple-mobile-web-app-title" content="Sol">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta property="og:type" content="website">
-<meta property="og:site_name" content="Sol's Collection">
-<meta property="og:title" content="Sol's Collection">
+<meta property="og:site_name" content="Sol">
+<meta property="og:title" content="Sol">
 <meta property="og:description" content="Stories that stay with you.">
 <meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Sol's Collection">
+<meta name="twitter:title" content="Sol">
 <meta name="twitter:description" content="Stories that stay with you.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400..700;1,6..96,400..700&family=Cinzel:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400..700;1,400..700&family=Playfair+Display:ital,wght@1,600;1,800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/author.css">
 <link rel="stylesheet" href="css/premium.css">
 <link rel="stylesheet" href="css/mobile.css">
+<link rel="stylesheet" href="css/app.css">
+<script src="js/boot.js"></script>
 </head>
 <body>
 <a class="skip-link" href="#top">Skip to content</a>
@@ -29,17 +39,13 @@
 <!-- HEADER -->
 <header class="site-header">
   <div class="header-inner">
-    <a href="#top" class="logo">
-      <div class="logo-text">
-        <span class="logo-name">Sol's Collection</span>
-        <span class="logo-tagline">Stories you'll keep coming back to.</span>
-      </div>
-    </a>
     <nav class="main-nav">
       <a href="#top">Home</a>
       <a href="#books">Books</a>
-      <a href="#genres">Genres</a>
-      <a href="#about">About</a>
+      <a href="#/genres">Genres</a>
+      <a href="#/library" data-nav-page="library">Library<span class="sol-badge" data-library-badge hidden></span></a>
+      <a href="#/discuss" data-nav-page="discuss">Discuss</a>
+      <a href="#/about" data-nav-page="about">About</a>
       <button id="loginNavButton" class="nav-button" type="button">Login</button>
       <button id="signupNavButton" class="nav-button primary" type="button">Sign Up</button>
       <button id="logoutButton" class="nav-button logout-button hidden" type="button">Logout</button>
@@ -52,14 +58,20 @@
 <div id="mobileMenu" class="mobile-menu" data-lenis-prevent>
   <a href="#top">Home</a>
   <a href="#books">Books</a>
-  <a href="#genres">Genres</a>
-  <a href="#about">About</a>
+  <a href="#/genres">Genres</a>
+  <a href="#/library">My Library<span class="sol-badge" data-library-badge hidden></span></a>
+  <a href="#/discuss">Discussion</a>
+  <a href="#/about">About</a>
+  <a href="#/me" id="mobileProfileButton" class="hidden">My Profile</a>
   <button id="mobileLoginButton" type="button">Login</button>
   <button id="mobileSignupButton" type="button">Sign Up</button>
   <button id="mobileLogoutButton" type="button" class="hidden">Logout</button>
 </div>
 
 <main id="top" tabindex="-1">
+
+<!-- PHONE TOP: search + genre chips (filled by js/mobile-home.js on phones) -->
+<div id="mTop" class="m-top" hidden></div>
 
 <!-- CINEMATIC HERO -->
 <section id="home" class="cine-hero">
@@ -84,14 +96,6 @@
   </div>
   <a href="#books" class="cine-scroll" aria-label="Scroll to books"><span></span>Scroll</a>
 </section>
-
-<div class="cine-marquee" aria-hidden="true">
-  <div class="cine-marquee-track">
-    <div><span>Romance</span><i></i><span>Revenge</span><i></i><span>Dark Romance</span><i></i><span>Drama</span><i></i><span>Mystery</span><i></i><span>Fantasy</span><i></i><span>Romance</span><i></i><span>Revenge</span><i></i><span>Dark Romance</span><i></i><span>Drama</span><i></i><span>Mystery</span><i></i><span>Fantasy</span><i></i></div>
-    <div><span>Romance</span><i></i><span>Revenge</span><i></i><span>Dark Romance</span><i></i><span>Drama</span><i></i><span>Mystery</span><i></i><span>Fantasy</span><i></i><span>Romance</span><i></i><span>Revenge</span><i></i><span>Dark Romance</span><i></i><span>Drama</span><i></i><span>Mystery</span><i></i><span>Fantasy</span><i></i></div>
-  </div>
-</div>
-
 
 <!-- BOOKS -->
 <section id="books" class="section books-section">
@@ -141,21 +145,20 @@
 </section>
 
 <!-- GENRES -->
-<section id="genres" class="section genres-section">
-  <div class="section-heading">
-    <p class="section-label">FIND YOUR NEXT STORY</p>
-    <h2>Genres</h2>
-  </div>
-  <div class="genres-grid">
-    <button class="genre-card" type="button" data-genre="Romance">Romance</button>
-    <button class="genre-card" type="button" data-genre="Drama">Drama</button>
-    <button class="genre-card" type="button" data-genre="Revenge">Revenge</button>
-    <button class="genre-card" type="button" data-genre="Fantasy">Fantasy</button>
-    <button class="genre-card" type="button" data-genre="Mystery">Mystery</button>
-    <button class="genre-card" type="button" data-genre="Dark Romance">Dark Romance</button>
-  </div>
-</section>
+</main>
 
+<!-- PAGES (js/pages.js): each tab has its own screen -->
+<div id="solPages">
+  <section class="sol-page" data-page="search" aria-label="Search" hidden><div class="sol-page-inner"></div></section>
+  <section class="sol-page" data-page="genres" aria-label="Genres" hidden><div class="sol-page-inner"></div></section>
+  <section class="sol-page" data-page="library" aria-label="Library" hidden><div class="sol-page-inner"></div></section>
+  <section class="sol-page" data-page="discuss" aria-label="Discussion" hidden><div class="sol-page-inner"></div></section>
+  <section class="sol-page" data-page="me" aria-label="Me" hidden><div class="sol-page-inner"></div></section>
+  <section class="sol-page sol-page-about" data-page="about" aria-label="About" hidden>
+    <div class="sol-page-inner">
+      <div class="sol-page-head"><a class="sol-back" href="#/me" aria-label="Back">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg></a><h1>About</h1></div>
+    </div>
 <!-- HERO + ABOUT THE CREATOR (combined) -->
 <section id="welcome" class="hero">
   <div class="hero-overlay"></div>
@@ -178,11 +181,11 @@
           “I write the kind of love you know you should run from but secretly hope will chase you.”
           — Miss Sol
         </blockquote>
-        <p>Behind Sol’s Collection is a writer who finds beauty in the darker sides of love.</p>
+        <p>Behind Sol is a writer who finds beauty in the darker sides of love.</p>
         <p>But beyond the stories, I’m also a BSIT student specializing in Cloud Computing, with skills in programming, web development, databases, and building digital experiences.</p>
         <p>Every story here carries a piece of imagination, emotion, and countless hours of work.</p>
         <p>So if you’re looking for a story that will make you smile and twisted…</p>
-        <p class="about-welcome">Welcome to Sol’s Collection.</p>
+        <p class="about-welcome">Welcome to Sol.</p>
         <ul class="skill-badges">
           <li>Writing &amp; Scriptwriting</li>
           <li>Web Development (HTML/CSS/JS)</li>
@@ -194,8 +197,8 @@
 
   </div>
 </section>
-
-</main>
+  </section>
+</div>
 
 <!-- BOOK INFORMATION MODAL -->
 <div id="bookModal" class="modal">
@@ -206,7 +209,7 @@
     <div class="book-modal-scroll">
       <!-- Header: cover (left) + details (right) -->
       <div class="book-modal-header">
-        <div id="modalBookCover" class="modal-book-cover">SC</div>
+        <div id="modalBookCover" class="modal-book-cover">S</div>
         <div class="book-modal-meta">
           <p id="modalBookGenre" class="modal-category">Romance</p>
           <h2 id="modalBookTitle">Vengeance Resurrection</h2>
@@ -237,10 +240,20 @@
         <ul id="bmList" class="bm-list"></ul>
         <button id="bmMore" class="bm-more hidden" type="button"></button>
       </section>
+
+      <!-- Ratings & reviews (filled by js/reviews.js) -->
+      <section id="reviewsPanel" class="sol-reviews" aria-labelledby="reviewsTitle" hidden>
+        <div class="sol-rev-top">
+          <h3 id="reviewsTitle">Ratings &amp; reviews</h3>
+          <div class="sol-rev-summary"></div>
+        </div>
+        <div class="sol-rev-body"></div>
+      </section>
     </div>
 
     <!-- Sticky call to action -->
     <div class="book-modal-actions">
+      <button id="libraryToggle" class="sol-lib-toggle" type="button" aria-pressed="false" aria-label="Add to library" title="Add to library" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></button>
       <button id="startReadingButton" class="read-button large" type="button">Start Reading</button>
     </div>
   </div>
@@ -291,6 +304,7 @@
     </aside>
 
     <article class="story-reader">
+      <div id="chapterBanner" class="chapter-banner" aria-hidden="true"></div>
       <div class="story-header">
         <p id="readerCategory" class="reader-category">Romance</p>
         <h1 id="chapterHeading"></h1>
@@ -302,10 +316,19 @@
 
       <div id="storyContent" class="story-content">Loading...</div>
 
-      <div class="reader-navigation">
-        <button id="previousChapter" class="reader-nav-button" type="button">← Previous</button>
-        <button id="nextChapter" class="reader-nav-button primary" type="button">Next →</button>
-      </div>
+      <nav class="reader-navigation chapter-end" aria-label="Chapter navigation">
+        <p id="chapterEndMark" class="chapter-end-mark">End of chapter</p>
+        <div class="chapter-end-links">
+          <button id="previousChapter" class="reader-nav-button" type="button">
+            <svg class="nav-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+            <span class="nav-text"><span class="nav-kicker">Previous</span><span id="previousChapterTitle" class="nav-title"></span></span>
+          </button>
+          <button id="nextChapter" class="reader-nav-button primary" type="button">
+            <span class="nav-text"><span class="nav-kicker">Next chapter</span><span id="nextChapterTitle" class="nav-title"></span></span>
+            <svg class="nav-arrow" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </button>
+        </div>
+      </nav>
 
       <!-- COMMENTS -->
       <section id="commentsSection" class="comments-section hidden" aria-labelledby="commentsTitle">
@@ -419,21 +442,53 @@
 
 <!-- FOOTER -->
 <footer class="site-footer">
-  <div class="footer-logo">Sol's Collection</div>
+  <div class="footer-logo"><img class="logo-mark footer-mark" src="/icons/logo.svg" alt="Sol" width="96" height="90"></div>
   <p>Stories you'll keep coming back to.</p>
   <nav class="footer-legal" aria-label="Legal">
     <a href="/privacy.html">Privacy Policy</a>
     <a href="/terms.html">Terms of Use</a>
     <a href="/refunds.html">Refund Policy</a>
   </nav>
-  <p class="copyright">© 2026 Sol's Collection. All rights reserved.</p>
+  <p class="copyright">© 2026 Sol. All rights reserved.</p>
 </footer>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js"></script>
+
+<!-- 18+ CHECK (js/story-details.js) -->
+<div id="matureModal" class="modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-box auth-box sol-mature-box">
+    <p class="section-label">18+ STORY</p>
+    <h2 id="matureTitle">This story</h2>
+    <p class="sol-muted">This story contains mature themes and is meant for readers 18 and older.</p>
+    <ul id="matureWarnings" class="sol-warning-list" hidden></ul>
+    <button id="matureContinue" type="button" class="auth-submit">I’m 18 or older, continue</button>
+    <button id="matureLeave" type="button" class="auth-link">Go back</button>
+  </div>
+</div>
+
+<!-- INSTALL + OFFLINE BANNERS (js/offline.js) -->
+<div id="installBanner" class="sol-install" role="region" aria-label="Install the app" hidden>
+  <img src="/icons/icon-192.png" alt="" width="40" height="40">
+  <p data-install-text>Install Sol</p>
+  <button type="button" class="read-button" data-install>Install</button>
+  <button type="button" class="sol-install-x" data-install-dismiss aria-label="Not now">×</button>
+</div>
+<div id="offlineBanner" class="sol-offline" role="status" hidden>You’re offline. Saved stories still open.</div>
+
+<!-- PHONE BOTTOM TAB BAR -->
+<nav id="mTabbar" class="m-tabbar" aria-label="Primary">
+  <button type="button" data-tab="home" class="active"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v10h14V10"/></svg><span>Home</span></button>
+  <button type="button" data-tab="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg><span>Search</span></button>
+  <button type="button" data-tab="library"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4v16H5zM11 4h4v16h-4z"/><path d="m17 5 3.5 1-3.5 14-3.2-.9"/></svg><span>Library</span><i class="sol-badge" data-library-badge hidden></i></button>
+  <button type="button" data-tab="discuss"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 13.5h4.5"/></svg><span>Discuss</span></button>
+  <button type="button" data-tab="me"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5c1.3-2 3.2-3 5.5-3s4.2 1 5.5 3"/></svg><span>Me</span></button>
+</nav>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js" integrity="sha384-JEyTNhjM6R1ElGoJns4U2Ln4ofPcqzSsynQkmEc/KGy6336qAZl70tDLufbkla+3" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js" integrity="sha384-g4NTh/Iv5PPU4xPyhEWqPcwtNXOvdaDI8LLnyYfyNZOjKJeYQyjzQ9X5275eBjpt" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js" integrity="sha384-Z3REaz79l2IaAZqJsSABtTbhjgOUYyV3p90XNnAPCSHg3EMTz1fouunq9WZRtj3d" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.1.14/dist/lenis.min.js" integrity="sha384-O55L/6rhHr9CFvrxqv5luxOCcmVaBmETbZbJDP+Do8T0pztTACsFBD/IXCNkj7DV" crossorigin="anonymous"></script>
 <script src="js/ui.js"></script>
 <script src="js/script.js"></script>
 <script src="js/comments.js"></script>
@@ -441,10 +496,25 @@
 <script src="js/reader-customize.js"></script>
 <script src="js/bookmarks.js"></script>
 <script src="js/reader-extras.js"></script>
+<script src="js/reader-clean.js"></script>
 <script src="js/author.js"></script>
 <script src="js/a11y.js"></script>
+<script src="js/mobile-home.js"></script>
+<script src="js/intro.js"></script>
 <script src="js/premium.js"></script>
 <script src="js/mobile.js"></script>
 <script src="js/shelf.js"></script>
+<script src="js/app-core.js"></script>
+<script src="js/pages.js"></script>
+<script src="js/offline.js"></script>
+<script src="js/story-details.js"></script>
+<script src="js/library.js"></script>
+<script src="js/reviews.js"></script>
+<script src="js/profile.js"></script>
+<script src="js/search.js"></script>
+<script src="js/genres.js"></script>
+<script src="js/rewards.js"></script>
+<script src="js/streak.js"></script>
+<script src="js/discuss.js"></script>
 </body>
 </html>

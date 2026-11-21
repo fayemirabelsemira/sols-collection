@@ -18,6 +18,7 @@
 
     var REACH_KEY = "solReached.v1";
     var LAST_KEY = "solLastRead.v1";
+    var DONE_KEY = "solChapterDone.v1";
 
     var content = document.getElementById("storyContent");
     var section = document.getElementById("readerSection");
@@ -48,6 +49,7 @@
         history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
         close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
         back: '<path d="m15 18-6-6 6-6"/>',
+        chev: '<path d="m9 18 6-6-6-6"/>',
         lock: '<rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
         share: '<path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><path d="m16 6-4-4-4 4"/><path d="M12 2v13"/>',
         mark: '<path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>',
@@ -191,10 +193,23 @@
         var all = readJSON(REACH_KEY);
         if ((Number(all[bid]) || 0) < n) { all[bid] = n; writeJSON(REACH_KEY, all); }
     }
+    /* chapters this reader has read to the end (per book): the cast only
+       ever shows what the story has revealed up to the scene on screen */
+    function doneFor(bid) { return Number(readJSON(DONE_KEY)[bid]) || 0; }
+    function setDone(bid, n) {
+        var all = readJSON(DONE_KEY);
+        if ((Number(all[bid]) || 0) >= n) return false;
+        all[bid] = n;
+        writeJSON(DONE_KEY, all);
+        return true;
+    }
+    /* spoiler line = the chapter on screen, not the furthest one ever opened.
+       The current chapter's secrets unlock only once its last lines are read. */
     function upTo() {
         var st = rs();
         if (!st.book || !st.chapter) return 0;
-        return Math.max(reachedFor(String(st.book.id)), Number(st.chapter.chapter_number) || 1);
+        var n = Number(st.chapter.chapter_number) || 1;
+        return doneFor(String(st.book.id)) >= n ? n : n - 1;
     }
 
     function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
@@ -263,6 +278,9 @@
         layer.querySelector(".cx-backdrop").addEventListener("click", closeSheet);
         layer.querySelector(".cx-close").addEventListener("click", closeSheet);
         backBtn.addEventListener("click", function () { renderCast(); });
+        sheetBody.addEventListener("scroll", function () {
+            layer.querySelector(".cx-sheet").classList.toggle("scrolled", sheetBody.scrollTop > 60);
+        }, { passive: true });
     }
 
     function openSheet() {
@@ -279,20 +297,23 @@
 
     function validColor(c) { return /^#[0-9a-f]{3,8}$/i.test(c || "") ? c : "#d4af37"; }
 
-    function portrait(ch, size) {
-        var wrap = el("div", "cx-portrait cx-" + size);
+    function monoOf(ch) { return (ch.name || "?").trim().charAt(0).toUpperCase(); }
+
+    /* paints a big monogram in the character's colour, then swaps in the photo if there is one */
+    function paintArt(wrap, ch) {
         wrap.style.setProperty("--accent", validColor(ch.accent));
-        var mono = el("span", "cx-mono", (ch.name || "?").trim().charAt(0).toUpperCase());
-        wrap.appendChild(mono);
+        wrap.appendChild(el("span", "cx-mono", monoOf(ch)));
         if (ch.portrait) {
             var img = new Image();
             img.alt = "";
-            img.loading = "lazy";
-            img.onload = function () { wrap.appendChild(img); mono.style.display = "none"; };
+            img.decoding = "async";
+            img.onload = function () { wrap.classList.add("has-photo"); wrap.appendChild(img); };
             img.src = ch.portrait;
         }
         return wrap;
     }
+
+    function portrait(ch, size) { return paintArt(el("div", "cx-portrait cx-" + size), ch); }
 
     function byId(id) {
         for (var i = 0; i < cast.length; i++) if (same(cast[i].id, id)) return cast[i];
@@ -302,65 +323,111 @@
     function throughLine() {
         var p = el("p", "cx-through");
         p.innerHTML = icon(I.lock, 13);
-        p.appendChild(document.createTextNode(" Spoiler-safe through Chapter " + upTo()));
+        var n = upTo();
+        p.appendChild(document.createTextNode(n > 0
+            ? " Spoiler-safe through Chapter " + n + ". Finish a chapter to unlock what it reveals."
+            : " Spoiler-safe. Finish this chapter to start meeting the characters."));
         return p;
+    }
+
+    function setSheetAccent(color) {
+        if (layer) layer.querySelector(".cx-sheet").style.setProperty("--sheet-accent", color);
+    }
+
+    function castTile(ch, i) {
+        var b = el("button", "cx-tile");
+        b.type = "button";
+        b.style.setProperty("--accent", validColor(ch.accent));
+        b.style.setProperty("--i", Math.min(i, 12));
+        b.appendChild(paintArt(el("div", "cx-art"), ch));
+        b.appendChild(el("span", "cx-tile-no", (i < 9 ? "0" : "") + (i + 1)));
+        var cap = el("span", "cx-tile-cap");
+        cap.appendChild(el("span", "cx-tile-name", ch.name));
+        if (ch.title) cap.appendChild(el("span", "cx-tile-sub", ch.title));
+        b.appendChild(cap);
+        b.addEventListener("click", function () { renderCard(ch, true); });
+        return b;
     }
 
     function renderCast() {
         ensureSheet();
         sheetState = { view: "cast", id: null };
         backBtn.classList.remove("show");
+        setSheetAccent("#ff6a4d");
         sheetBody.innerHTML = "";
-        sheetBody.appendChild(el("p", "cx-eyebrow", "THE CAST"));
-        sheetBody.appendChild(el("h2", "cx-title", "Characters"));
+        var top = el("header", "cx-top");
+        top.appendChild(el("p", "cx-eyebrow", "THE CAST"));
+        top.appendChild(el("h2", "cx-title", "Characters"));
+        if (cast.length) top.appendChild(el("p", "cx-count", cast.length + (cast.length === 1 ? " character" : " characters") + " you\u2019ve met so far"));
+        sheetBody.appendChild(top);
         if (!cast.length) {
-            sheetBody.appendChild(el("p", "cx-empty", "Character profiles for this book are coming soon."));
+            sheetBody.appendChild(el("p", "cx-empty", upTo() > 0
+                ? "Character profiles for this book are coming soon."
+                : "No characters yet — they appear here as the story introduces them."));
         } else {
             var grid = el("div", "cx-grid");
-            cast.forEach(function (ch) {
-                var b = el("button", "cx-tile");
-                b.type = "button";
-                b.appendChild(portrait(ch, "md"));
-                b.appendChild(el("span", "cx-tile-name", ch.name));
-                if (ch.title) b.appendChild(el("span", "cx-tile-sub", ch.title));
-                b.addEventListener("click", function () { renderCard(ch, true); });
-                grid.appendChild(b);
-            });
+            cast.forEach(function (ch, i) { grid.appendChild(castTile(ch, i)); });
             sheetBody.appendChild(grid);
         }
         sheetBody.appendChild(throughLine());
-        sheetBody.parentNode.scrollTop = 0;
+        sheetBody.scrollTop = 0;
     }
 
     function renderCard(ch, fromCast) {
         ensureSheet();
         sheetState = { view: "card", id: ch.id };
         backBtn.classList.toggle("show", !!fromCast || cast.length > 1);
+        var accent = validColor(ch.accent);
+        setSheetAccent(accent);
         sheetBody.innerHTML = "";
 
-        var head = el("div", "cx-head");
-        head.appendChild(portrait(ch, "lg"));
-        var hm = el("div", "cx-head-meta");
-        if (ch.title) hm.appendChild(el("p", "cx-eyebrow", ch.title.toUpperCase()));
-        hm.appendChild(el("h2", "cx-title", ch.name));
-        head.appendChild(hm);
+        /* profile header: picture + labelled info box */
+        var head = el("header", "cx-profile");
+        head.style.setProperty("--accent", accent);
+        head.appendChild(paintArt(el("div", "cx-photo"), ch));
+        var info = el("dl", "cx-info");
+        function row(label, value) {
+            if (!value) return;
+            var r = el("div", "cx-row");
+            r.appendChild(el("dt", "", label));
+            r.appendChild(el("dd", "", value));
+            info.appendChild(r);
+        }
+        var aka = (ch.aliases || []).filter(function (a) { return a && String(a).trim(); });
+        row("Name", ch.name);
+        row(aka.length > 1 ? "Nicknames" : "Nickname", aka.join(", "));
+        row("Role", ch.title);
+        head.appendChild(info);
         sheetBody.appendChild(head);
+
+        var main = el("div", "cx-main");
+        main.style.setProperty("--accent", accent);
+        var n = 0;
+        function add(node) { node.style.setProperty("--i", n++); main.appendChild(node); }
+        function card(title) {
+            var c = el("section", "cx-card");
+            c.appendChild(el("h3", "cx-card-h", title));
+            add(c);
+            return c;
+        }
 
         var facts = ch.facts || [];
         var traits = facts.filter(function (f) { return f.kind === "trait"; });
         var about = facts.filter(function (f) { return f.kind === "about"; });
         var rels = facts.filter(function (f) { return f.kind === "relationship"; });
 
-        if (traits.length) {
-            var chips = el("div", "cx-chips");
-            traits.forEach(function (f) { chips.appendChild(el("span", "cx-chip", f.text)); });
-            sheetBody.appendChild(chips);
-        }
         if (about.length) {
-            about.forEach(function (f) { sheetBody.appendChild(el("p", "cx-about", f.text)); });
+            var bg = card("Background");
+            about.forEach(function (f, i) { bg.appendChild(el("p", i === 0 ? "cx-lead" : "cx-about", f.text)); });
+        }
+        if (traits.length) {
+            var tc = card("Traits");
+            var tl = el("ul", "cx-traits");
+            traits.forEach(function (f) { tl.appendChild(el("li", "cx-trait", f.text)); });
+            tc.appendChild(tl);
         }
         if (rels.length) {
-            sheetBody.appendChild(el("h3", "cx-sub", "Relationships"));
+            var rc = card("Relationships");
             var list = el("div", "cx-rels");
             rels.forEach(function (f) {
                 var other = f.related ? byId(f.related) : null;
@@ -373,22 +440,28 @@
                 if (other) t.appendChild(el("b", "", other.name));
                 t.appendChild(el("span", "", f.text));
                 row.appendChild(t);
-                if (other) row.addEventListener("click", function () { renderCard(other, true); });
+                if (other) {
+                    var go = el("span", "cx-rel-go");
+                    go.innerHTML = icon(I.chev, 16);
+                    row.appendChild(go);
+                    row.addEventListener("click", function () { renderCard(other, true); });
+                }
                 list.appendChild(row);
             });
-            sheetBody.appendChild(list);
+            rc.appendChild(list);
         }
         if (!traits.length && !about.length && !rels.length) {
-            sheetBody.appendChild(el("p", "cx-empty", "Nothing is known about them yet."));
+            add(el("p", "cx-empty", "Nothing is known about them yet."));
         }
         if (Number(ch.locked) > 0) {
             var lk = el("p", "cx-locked");
             lk.innerHTML = icon(I.lock, 14);
             lk.appendChild(document.createTextNode(" " + ch.locked + " more detail" + (Number(ch.locked) === 1 ? "" : "s") + " unlock as you read"));
-            sheetBody.appendChild(lk);
+            add(lk);
         }
+        sheetBody.appendChild(main);
         sheetBody.appendChild(throughLine());
-        sheetBody.parentNode.scrollTop = 0;
+        sheetBody.scrollTop = 0;
     }
 
     function openCast() {
@@ -415,7 +488,7 @@
             rcLayer.innerHTML =
                 '<div class="rc-backdrop"></div>' +
                 '<section class="rc-card" role="dialog" aria-modal="true" aria-label="Previously on">' +
-                '<p class="rc-eyebrow">PREVIOUSLY ON\u2026</p><h2 class="rc-book"></h2><p class="rc-away"></p>' +
+                '<p class="rc-eyebrow">Previously on\u2026</p><h2 class="rc-book"></h2><p class="rc-away"></p>' +
                 '<div class="rc-timeline"></div>' +
                 '<button class="read-button large rc-go" type="button">Continue reading</button></section>';
             document.body.appendChild(rcLayer);
@@ -429,8 +502,10 @@
         tl.innerHTML = "";
         rows.forEach(function (r) {
             var item = el("div", "rc-item");
-            item.appendChild(el("p", "rc-chap", "CHAPTER " + r.chapter_number));
-            if (r.title) item.appendChild(el("h3", "rc-title", r.title));
+            var label = "Chapter " + r.chapter_number;
+            var named = r.title && !/^\s*chapter\s*\d+\s*$/i.test(r.title);
+            item.appendChild(el("p", "rc-chap", label));
+            if (named) item.appendChild(el("h3", "rc-title", r.title));
             item.appendChild(el("p", "rc-text", r.recap));
             tl.appendChild(item);
         });
@@ -614,8 +689,8 @@
         var W = 1080, H = 1350;
         var fontsReady = document.fonts && document.fonts.load
             ? Promise.all([
-                document.fonts.load('italic 400 56px "Playfair Display"'),
-                document.fonts.load('600 30px "Cinzel"')
+                document.fonts.load('italic 400 56px "Inter"'),
+                document.fonts.load('600 30px "Inter"')
               ]).catch(function () {})
             : Promise.resolve();
         return fontsReady.then(function () {
@@ -637,10 +712,10 @@
 
             ctx.textAlign = "center";
             ctx.fillStyle = "#e5c158";
-            ctx.font = '600 28px "Cinzel", Georgia, serif';
-            spaced(ctx, "SOL\u2019S COLLECTION", W / 2, 150, 8);
+            ctx.font = '600 28px "Inter", Arial, sans-serif';
+            spaced(ctx, "SOL", W / 2, 150, 8);
 
-            ctx.font = '400 240px "Playfair Display", Georgia, serif';
+            ctx.font = '400 240px "Inter", Arial, sans-serif';
             ctx.fillStyle = "rgba(212,175,55,.9)";
             ctx.fillText("\u201C", W / 2, 400);
 
@@ -648,7 +723,7 @@
             var maxW = W - 240, maxH = 620, size = 62, lines, lh;
             ctx.fillStyle = "#f3ede1";
             do {
-                ctx.font = 'italic 400 ' + size + 'px "Playfair Display", Georgia, serif';
+                ctx.font = 'italic 400 ' + size + 'px "Inter", Arial, sans-serif';
                 lh = Math.round(size * 1.38);
                 lines = wrapLines(ctx, text, maxW);
                 size -= 3;
@@ -662,10 +737,10 @@
             ctx.fillStyle = g; ctx.fillRect(W / 2 - 120, 1130, 240, 2);
 
             ctx.fillStyle = "#e5c158";
-            ctx.font = 'italic 400 38px "Playfair Display", Georgia, serif';
+            ctx.font = 'italic 400 38px "Inter", Arial, sans-serif';
             ctx.fillText(o.book || "", W / 2, 1188);
             ctx.fillStyle = "rgba(245,245,247,.7)";
-            ctx.font = '600 22px "Cinzel", Georgia, serif';
+            ctx.font = '600 22px "Inter", Arial, sans-serif';
             spaced(ctx, o.chapter ? "CHAPTER " + o.chapter : "", W / 2, 1236, 6);
             ctx.fillStyle = "rgba(245,245,247,.45)";
             ctx.font = '400 22px Inter, Arial, sans-serif';
@@ -681,7 +756,7 @@
                 var file;
                 try { file = new File([blob], "sols-collection-quote.png", { type: "image/png" }); } catch (e) { file = null; }
                 if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-                    navigator.share({ files: [file], title: o.book || "Sol\u2019s Collection" }).catch(function () {});
+                    navigator.share({ files: [file], title: o.book || "Sol" }).catch(function () {});
                     return;
                 }
                 var a = document.createElement("a");
@@ -793,6 +868,8 @@
         if (!st.book || !st.chapter || !content) return;
         var bid = String(st.book.id), n = Number(st.chapter.chapter_number) || 1;
         setReached(bid, n);
+        endSeen = false;
+        setTimeout(checkChapterEnd, 1200);   /* a short chapter may fit on one screen */
         indexText();
         trackSession();
         loadCast(paintNames);
@@ -800,8 +877,32 @@
         hidePop();
     }
 
+    /* the reader reached the last lines of the chapter: unlock what it revealed */
+    var endSeen = false, endTick = false;
+    function checkChapterEnd() {
+        endTick = false;
+        if (endSeen || !content || !section || section.classList.contains("hidden")) return;
+        var st = rs();
+        if (!st.book || !st.chapter || !content.textContent.trim()) return;
+        var r = content.getBoundingClientRect();
+        if (r.height < 40 || r.bottom > (window.innerHeight || document.documentElement.clientHeight) + 60) return;
+        endSeen = true;
+        if (!setDone(String(st.book.id), Number(st.chapter.chapter_number) || 1)) return;
+        castKey = "";
+        loadCast(function () {
+            paintNames();
+            if (layer && layer.classList.contains("open") && sheetState.view === "cast") renderCast();
+        });
+    }
+
     function bindContentEvents() {
         if (!content) return;
+
+        document.addEventListener("scroll", function () {
+            if (endSeen || endTick) return;
+            endTick = true;
+            requestAnimationFrame(checkChapterEnd);
+        }, { capture: true, passive: true });
 
         content.addEventListener("click", function (e) {
             var sel = window.getSelection && window.getSelection();

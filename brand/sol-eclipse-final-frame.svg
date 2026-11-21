@@ -1,0 +1,102 @@
+<svg id="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <radialGradient id="sky" cx="960" cy="470" r="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4a0b1d" stop-opacity=".9"/>
+      <stop offset=".35" stop-color="#22070f" stop-opacity=".6"/>
+      <stop offset="1" stop-color="#070508" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="960" cy="540" r="1150" gradientUnits="userSpaceOnUse">
+      <stop offset=".55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".75"/>
+    </radialGradient>
+    <radialGradient id="sunHot" cx="0" cy="0" r="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff6ea"/>
+      <stop offset=".45" stop-color="#ffd2a1"/>
+      <stop offset=".8" stop-color="#ff9a3c"/>
+      <stop offset="1" stop-color="#ff6a4d"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="-150" y1="-150" x2="150" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe9cc"/>
+      <stop offset=".5" stop-color="#ffbe8f"/>
+      <stop offset="1" stop-color="#ff8a45"/>
+    </linearGradient>
+    <radialGradient id="corona" cx="0" cy="0" r="290" gradientUnits="userSpaceOnUse">
+      <stop offset=".5" stop-color="#fff1e0" stop-opacity="0"/>
+      <stop offset=".52" stop-color="#fff1e0" stop-opacity=".95"/>
+      <stop offset=".6" stop-color="#ffc58f" stop-opacity=".45"/>
+      <stop offset=".8" stop-color="#ff6a4d" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#e0274f" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bloom">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".18" stop-color="#fff3e2" stop-opacity=".85"/>
+      <stop offset=".5" stop-color="#ffb199" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#ff6a4d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ray" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="640" y1="0" x2="1340" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff3d5e"/>
+      <stop offset=".38" stop-color="#ffb199"/>
+      <stop offset=".6" stop-color="#ff6a4d"/>
+      <stop offset="1" stop-color="#ff9a3c"/>
+    </linearGradient>
+    <filter id="blur30" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="30"/></filter>
+    <filter id="blur6" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="blur3" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="blur1" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.2"/></filter>
+    <!-- the (invisible) moon: whatever it covers disappears -->
+    <mask id="moonMask" maskUnits="userSpaceOnUse" x="-1000" y="-1000" width="2000" height="2000">
+      <rect x="-1000" y="-1000" width="2000" height="2000" fill="#fff"/>
+      <circle id="moonDisc" r="150" fill="#000" cx="72.00" cy="-46.50"/>
+    </mask>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#070508"/>
+  <rect id="skyGlow" width="1920" height="1080" fill="url(#sky)" opacity="0.800"/>
+
+  <!-- the eclipse (local origin = sun centre) -->
+  <g id="eclipse" transform="translate(806.00 296.00) scale(0.6000)">
+    <g id="rays" opacity="0.000" filter="url(#blur6)" transform="rotate(24.00)"><rect x="150" y="-2.6" width="120" height="5.2" rx="2" fill="url(#ray)" opacity="0.35" transform="rotate(-5)"/><rect x="150" y="-1.6" width="173" height="3.2" rx="2" fill="url(#ray)" opacity="0.72" transform="rotate(29.5)"/><rect x="150" y="-1.6" width="136" height="3.2" rx="2" fill="url(#ray)" opacity="0.59" transform="rotate(40)"/><rect x="150" y="-2.6" width="189" height="5.2" rx="2" fill="url(#ray)" opacity="0.46" transform="rotate(74.5)"/><rect x="150" y="-1.6" width="152" height="3.2" rx="2" fill="url(#ray)" opacity="0.83" transform="rotate(85)"/><rect x="150" y="-1.6" width="205" height="3.2" rx="2" fill="url(#ray)" opacity="0.70" transform="rotate(119.5)"/><rect x="150" y="-2.6" width="168" height="5.2" rx="2" fill="url(#ray)" opacity="0.57" transform="rotate(130)"/><rect x="150" y="-1.6" width="131" height="3.2" rx="2" fill="url(#ray)" opacity="0.44" transform="rotate(164.5)"/><rect x="150" y="-1.6" width="184" height="3.2" rx="2" fill="url(#ray)" opacity="0.81" transform="rotate(175)"/><rect x="150" y="-2.6" width="147" height="5.2" rx="2" fill="url(#ray)" opacity="0.68" transform="rotate(209.5)"/><rect x="150" y="-1.6" width="200" height="3.2" rx="2" fill="url(#ray)" opacity="0.55" transform="rotate(220)"/><rect x="150" y="-1.6" width="163" height="3.2" rx="2" fill="url(#ray)" opacity="0.42" transform="rotate(254.5)"/><rect x="150" y="-2.6" width="126" height="5.2" rx="2" fill="url(#ray)" opacity="0.79" transform="rotate(265)"/><rect x="150" y="-1.6" width="179" height="3.2" rx="2" fill="url(#ray)" opacity="0.66" transform="rotate(299.5)"/><rect x="150" y="-1.6" width="142" height="3.2" rx="2" fill="url(#ray)" opacity="0.53" transform="rotate(310)"/><rect x="150" y="-2.6" width="195" height="5.2" rx="2" fill="url(#ray)" opacity="0.40" transform="rotate(344.5)"/></g>
+    <circle id="coronaGlow" r="290" fill="url(#corona)" opacity="0.000"/>
+    <circle id="rim" r="151" fill="none" stroke="#fff3e2" stroke-width="3" filter="url(#blur1)" opacity="0.000"/>
+    <!-- glow is blurred AFTER the moon cuts it, so it hugs the crescent -->
+    <g id="sunHalo" filter="url(#blur30)" opacity="0.340">
+      <g mask="url(#moonMask)"><circle id="sunHaloDisc" r="150.00" fill="#ff7a45"/></g>
+    </g>
+    <g mask="url(#moonMask)">
+      <circle id="sunDisc" r="150.00" fill="url(#sunHot)" opacity="0.000"/>
+      <circle id="goldDisc" r="150.00" fill="url(#gold)" opacity="1.000"/>
+    </g>
+    <g id="diamond" opacity="0.000" transform="translate(-126.01 81.38) scale(1.200)">
+      <circle r="150" fill="url(#bloom)"/>
+      <ellipse rx="260" ry="2.2" fill="url(#bloom)" transform="rotate(-18)"/>
+      <ellipse rx="2.2" ry="200" fill="url(#bloom)" transform="rotate(-18)"/>
+      <circle r="9" fill="#fff" filter="url(#blur3)"/>
+    </g>
+  </g>
+
+  <circle id="ember" cx="960" cy="470" r="2.50" fill="#ffd9b0" opacity="0.000"/>
+  <circle id="emberGlow" cx="960" cy="470" r="40" fill="url(#bloom)" opacity="0.000"/>
+
+  <g id="sigGlow" fill="none" stroke="url(#brand)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" filter="url(#blur6)" opacity="0.400" transform="translate(960 700) skewX(-11) translate(-960 -700)"><path d="M 902 420 C 894 388, 842 374, 800 390 C 754 408, 746 462, 790 492 C 836 524, 902 548, 904 612 C 906 672, 838 712, 770 706 C 726 702, 704 676, 716 650" stroke-dasharray="696.77978515625 696.77978515625" stroke-dashoffset="0.00" opacity="1"/><path d="M 1000 618 C 980 602, 946 610, 940 646 C 934 684, 962 706, 988 698 C 1014 690, 1024 656, 1012 630 C 1004 614, 988 616, 996 630 C 1008 648, 1040 652, 1066 640 C 1110 620, 1160 520, 1166 450 C 1170 400, 1150 380, 1136 396 C 1116 420, 1112 520, 1116 600 C 1120 670, 1140 704, 1176 702 C 1206 700, 1228 684, 1246 668" stroke-dasharray="1076.0145263671875 1076.0145263671875" stroke-dashoffset="0.00" opacity="1"/><path d="M 704 752 C 860 772, 1110 764, 1296 716" stroke-dasharray="596.01123046875 596.01123046875" stroke-dashoffset="0.00" opacity="1"/></g>
+  <g id="sig" fill="none" stroke="url(#brand)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" transform="translate(960 700) skewX(-11) translate(-960 -700)"><path d="M 902 420 C 894 388, 842 374, 800 390 C 754 408, 746 462, 790 492 C 836 524, 902 548, 904 612 C 906 672, 838 712, 770 706 C 726 702, 704 676, 716 650" stroke-dasharray="696.77978515625 696.77978515625" stroke-dashoffset="0.00" opacity="1"/><path d="M 1000 618 C 980 602, 946 610, 940 646 C 934 684, 962 706, 988 698 C 1014 690, 1024 656, 1012 630 C 1004 614, 988 616, 996 630 C 1008 648, 1040 652, 1066 640 C 1110 620, 1160 520, 1166 450 C 1170 400, 1150 380, 1136 396 C 1116 420, 1112 520, 1116 600 C 1120 670, 1140 704, 1176 702 C 1206 700, 1228 684, 1246 668" stroke-dasharray="1076.0145263671875 1076.0145263671875" stroke-dashoffset="0.00" opacity="1"/><path d="M 704 752 C 860 772, 1110 764, 1296 716" stroke-dasharray="596.01123046875 596.01123046875" stroke-dashoffset="0.00" opacity="1"/></g>
+
+  <path id="cometTail" fill="none" stroke="#fff3e2" stroke-width="3" stroke-linecap="round" opacity="0.000" filter="url(#blur1)" d="M 921.76 368.44 Q 939.09 394.22 956.43 420.00"/>
+  <g id="nib" opacity="0.000" transform="translate(1292.89 716.00)">
+    <circle r="22" fill="url(#bloom)" opacity=".9"/>
+    <circle r="3.4" fill="#fff"/>
+  </g>
+
+  <text id="tagline" x="1000" y="842" text-anchor="middle" fill="#f1dccd" opacity="0.880" font-family="Didot, 'Bodoni 72', 'Playfair Display', Georgia, serif" font-size="25" letter-spacing="13.00" transform="translate(0 0.00)">STORIES THAT STAY WITH YOU</text>
+
+  <g id="glint" opacity="0.000" transform="translate(780.81 209.60) rotate(55.00) scale(0.400)">
+    <circle r="16" fill="url(#bloom)"/>
+    <ellipse rx="34" ry="1.4" fill="#fff"/>
+    <ellipse rx="1.4" ry="26" fill="#fff"/>
+  </g>
+
+  <rect width="1920" height="1080" fill="url(#vignette)" pointer-events="none"/>
+</svg>

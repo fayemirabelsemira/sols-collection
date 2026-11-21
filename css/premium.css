@@ -1,5 +1,5 @@
 /* =========================================================
-   SOL'S COLLECTION — ECLIPSE NOIR (premium layer)
+   SOL — ECLIPSE NOIR (premium layer)
    Loads AFTER style.css + author.css. Visual only; no layout
    rules from your mobile work are removed.
 ========================================================= */
@@ -12,9 +12,9 @@
   --border:rgba(255,226,214,.11);
   --brushed:linear-gradient(120deg,#ff3d5e 0%,#ff7a45 55%,#ffb347 100%);
   --crimson-grad:linear-gradient(145deg,#e0274f,#3a0716);
-  --font-display:"Bodoni Moda","Playfair Display",Georgia,serif;
-  --font-serif:"Bodoni Moda","Playfair Display",Georgia,serif;
   --font-ui:"Inter",Arial,sans-serif;
+  --font-display:var(--font-ui);
+  --font-serif:var(--font-ui);
   --radius:20px;
   --ease-out:cubic-bezier(.16,1,.3,1);
 }
@@ -46,19 +46,6 @@ html.has-gsap{scroll-behavior:auto}
 .scroll-progress{position:fixed;top:0;left:0;right:0;height:2px;z-index:3000;transform:scaleX(0);transform-origin:0 50%;
   background:var(--brushed);box-shadow:0 0 14px rgba(255,106,77,.7);pointer-events:none}
 body.reader-open .scroll-progress{opacity:0}
-
-/* ---------- Custom cursor (fine pointers only) ---------- */
-.cursor-dot,.cursor-ring{position:fixed;top:0;left:0;z-index:9999;pointer-events:none;border-radius:50%;opacity:0;transition:opacity .3s}
-.cursor-dot{width:6px;height:6px;margin:-3px 0 0 -3px;background:var(--ember-hi)}
-.cursor-ring{width:38px;height:38px;margin:-19px 0 0 -19px;border:1px solid rgba(255,177,153,.55);
-  display:grid;place-items:center;font:600 10px var(--font-ui);letter-spacing:.14em;text-transform:uppercase;color:#1a0a06;
-  transition:opacity .3s,background .3s,border-color .3s,width .35s var(--ease-out),height .35s var(--ease-out),margin .35s var(--ease-out)}
-html.has-cursor .cursor-dot,html.has-cursor .cursor-ring{opacity:1}
-.cursor-ring.is-link{width:64px;height:64px;margin:-32px 0 0 -32px;background:rgba(255,106,77,.14);border-color:var(--ember)}
-.cursor-ring.is-hidden,.cursor-dot.is-hidden{opacity:0!important}
-@media (hover:hover) and (pointer:fine){
-  html.has-cursor body *:not(input):not(textarea):not(select):not(#storyContent):not(#storyContent *){cursor:none!important}
-}
 
 /* ---------- Intro curtain ---------- */
 .intro{position:fixed;inset:0;z-index:10000;background:#050305;display:grid;place-items:center;overflow:hidden}
@@ -122,12 +109,6 @@ html.has-cursor .cursor-dot,html.has-cursor .cursor-ring{opacity:1}
 .cine-scroll span{width:1px;height:46px;background:linear-gradient(var(--ember),transparent);transform-origin:top;animation:cue 2s var(--ease-out) infinite}
 @keyframes cue{0%{transform:scaleY(0)}50%{transform:scaleY(1)}100%{transform:scaleY(1);opacity:0}}
 
-/* ---------- Marquee ---------- */
-.cine-marquee{position:relative;overflow:hidden;padding:26px 0;border-block:1px solid var(--border);background:rgba(255,255,255,.012);margin-bottom:20px}
-.cine-marquee-track{display:flex;width:max-content;will-change:transform}
-.cine-marquee-track>div{display:flex;align-items:center;flex-shrink:0}
-.cine-marquee span{font:italic 500 clamp(28px,5vw,60px)/1 var(--font-display);color:transparent;-webkit-text-stroke:1px rgba(255,226,214,.35);padding:0 .5em;white-space:nowrap}
-.cine-marquee i{width:10px;height:10px;border-radius:50%;background:var(--brushed);flex-shrink:0;box-shadow:0 0 18px rgba(255,106,77,.8)}
 
 /* ---------- Sections ---------- */
 .section{padding:110px 0}
@@ -220,7 +201,7 @@ html.has-gsap .modal-box{animation:none}
 @media (prefers-reduced-motion:reduce){
   .grain,.cine-eclipse .corona,.cine-scroll span{animation:none}
   .book-card,.book-card.is-tilting{transition:none}
-  .intro,.cursor-dot,.cursor-ring{display:none}
+  .intro{display:none}
 }
 
 /* ---------- Continue Reading cover ---------- */
@@ -228,3 +209,6 @@ html.has-gsap .modal-box{animation:none}
 .continue-cover.has-cover img{width:100%;height:100%;object-fit:cover;display:block}
 .continue-cover.has-cover::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent 60%,rgba(7,5,8,.55));pointer-events:none}
 .section-heading .section-label{margin-bottom:20px}
+/* ---------- One font everywhere (reader included) ---------- */
+.story-content,#storyContent,#readerContent{font-family:var(--font-ui)!important}
+.font-select,#fontFamily{display:none!important}

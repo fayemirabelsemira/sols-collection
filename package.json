@@ -3,7 +3,9 @@
   "private": true,
   "scripts": {
     "build": "node build.mjs",
-    "deploy": "node build.mjs && wrangler deploy -c wrangler.build.jsonc"
+    "deploy": "node build.mjs && wrangler deploy -c wrangler.build.jsonc",
+    "test": "node --test tests/security.test.mjs",
+    "test:sql": "sh tests/run-sql-tests.sh"
   },
   "devDependencies": {
     "esbuild": "^0.25.0",

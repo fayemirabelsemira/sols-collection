@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sol: Eclipse Ignition</title>
+<style>
+  :root{--ui:#a8a39a;--ink:#f5f5f7;--line:rgba(255,106,77,.25)}
+  *{box-sizing:border-box;margin:0}
+  html,body{height:100%;background:#000;color:var(--ink);font:14px/1.4 Inter,system-ui,sans-serif}
+  body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:16px}
+  #stage{width:min(100%,calc((100vh - 110px) * 16 / 9));aspect-ratio:16/9;box-shadow:0 0 0 1px #1a1418}
+  #stage svg{display:block;width:100%;height:100%}
+  .bar{display:flex;align-items:center;gap:12px;width:min(100%,960px)}
+  button{height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--line);background:#120d12;color:var(--ink);font:600 13px inherit;cursor:pointer}
+  button:hover{border-color:#ff6a4d}
+  input[type=range]{flex:1;accent-color:#ff6a4d}
+  #time{width:64px;text-align:right;color:var(--ui);font-variant-numeric:tabular-nums}
+  #status{color:var(--ui);font-size:12px;min-height:1.4em}
+  body.export .bar,body.export #status{display:none}
+  body.still{padding:0}
+  body.still #stage{width:100vw;box-shadow:none}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mp4-muxer@5.1.3/build/mp4-muxer.min.js"></script>
+</head>
+<body>
+<div id="stage">
+<svg id="logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080">
+  <defs>
+    <radialGradient id="sky" cx="960" cy="470" r="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#4a0b1d" stop-opacity=".9"/>
+      <stop offset=".35" stop-color="#22070f" stop-opacity=".6"/>
+      <stop offset="1" stop-color="#070508" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="960" cy="540" r="1150" gradientUnits="userSpaceOnUse">
+      <stop offset=".55" stop-color="#000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000" stop-opacity=".75"/>
+    </radialGradient>
+    <radialGradient id="sunHot" cx="0" cy="0" r="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff6ea"/>
+      <stop offset=".45" stop-color="#ffd2a1"/>
+      <stop offset=".8" stop-color="#ff9a3c"/>
+      <stop offset="1" stop-color="#ff6a4d"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="-150" y1="-150" x2="150" y2="150" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe9cc"/>
+      <stop offset=".5" stop-color="#ffbe8f"/>
+      <stop offset="1" stop-color="#ff8a45"/>
+    </linearGradient>
+    <radialGradient id="corona" cx="0" cy="0" r="290" gradientUnits="userSpaceOnUse">
+      <stop offset=".5" stop-color="#fff1e0" stop-opacity="0"/>
+      <stop offset=".52" stop-color="#fff1e0" stop-opacity=".95"/>
+      <stop offset=".6" stop-color="#ffc58f" stop-opacity=".45"/>
+      <stop offset=".8" stop-color="#ff6a4d" stop-opacity=".12"/>
+      <stop offset="1" stop-color="#e0274f" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bloom">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".18" stop-color="#fff3e2" stop-opacity=".85"/>
+      <stop offset=".5" stop-color="#ffb199" stop-opacity=".25"/>
+      <stop offset="1" stop-color="#ff6a4d" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ray" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="brand" x1="640" y1="0" x2="1340" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ff3d5e"/>
+      <stop offset=".38" stop-color="#ffb199"/>
+      <stop offset=".6" stop-color="#ff6a4d"/>
+      <stop offset="1" stop-color="#ff9a3c"/>
+    </linearGradient>
+    <filter id="blur30" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="30"/></filter>
+    <filter id="blur6" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter>
+    <filter id="blur3" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+    <filter id="blur1" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="1.2"/></filter>
+    <!-- the (invisible) moon: whatever it covers disappears -->
+    <mask id="moonMask" maskUnits="userSpaceOnUse" x="-1000" y="-1000" width="2000" height="2000">
+      <rect x="-1000" y="-1000" width="2000" height="2000" fill="#fff"/>
+      <circle id="moonDisc" r="150" fill="#000"/>
+    </mask>
+  </defs>
+
+  <rect width="1920" height="1080" fill="#070508"/>
+  <rect id="skyGlow" width="1920" height="1080" fill="url(#sky)" opacity="0"/>
+
+  <!-- the eclipse (local origin = sun centre) -->
+  <g id="eclipse">
+    <g id="rays" opacity="0" filter="url(#blur6)"></g>
+    <circle id="coronaGlow" r="290" fill="url(#corona)" opacity="0"/>
+    <circle id="rim" r="151" fill="none" stroke="#fff3e2" stroke-width="3" filter="url(#blur1)" opacity="0"/>
+    <!-- glow is blurred AFTER the moon cuts it, so it hugs the crescent -->
+    <g id="sunHalo" filter="url(#blur30)" opacity="0">
+      <g mask="url(#moonMask)"><circle id="sunHaloDisc" r="150" fill="#ff7a45"/></g>
+    </g>
+    <g mask="url(#moonMask)">
+      <circle id="sunDisc" r="150" fill="url(#sunHot)" opacity="0"/>
+      <circle id="goldDisc" r="150" fill="url(#gold)" opacity="0"/>
+    </g>
+    <g id="diamond" opacity="0">
+      <circle r="150" fill="url(#bloom)"/>
+      <ellipse rx="260" ry="2.2" fill="url(#bloom)" transform="rotate(-18)"/>
+      <ellipse rx="2.2" ry="200" fill="url(#bloom)" transform="rotate(-18)"/>
+      <circle r="9" fill="#fff" filter="url(#blur3)"/>
+    </g>
+  </g>
+
+  <circle id="ember" cx="960" cy="470" r="3" fill="#ffd9b0" opacity="0"/>
+  <circle id="emberGlow" cx="960" cy="470" r="40" fill="url(#bloom)" opacity="0"/>
+
+  <g id="sigGlow" fill="none" stroke="url(#brand)" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" filter="url(#blur6)" opacity="0"></g>
+  <g id="sig" fill="none" stroke="url(#brand)" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"></g>
+
+  <path id="cometTail" fill="none" stroke="#fff3e2" stroke-width="3" stroke-linecap="round" opacity="0" filter="url(#blur1)"/>
+  <g id="nib" opacity="0">
+    <circle r="22" fill="url(#bloom)" opacity=".9"/>
+    <circle r="3.4" fill="#fff"/>
+  </g>
+
+  <text id="tagline" x="1000" y="842" text-anchor="middle" fill="#f1dccd" opacity="0"
+        font-family="Didot, 'Bodoni 72', 'Playfair Display', Georgia, serif" font-size="25" letter-spacing="14">STORIES THAT STAY WITH YOU</text>
+
+  <g id="glint" opacity="0">
+    <circle r="16" fill="url(#bloom)"/>
+    <ellipse rx="34" ry="1.4" fill="#fff"/>
+    <ellipse rx="1.4" ry="26" fill="#fff"/>
+  </g>
+
+  <rect width="1920" height="1080" fill="url(#vignette)" pointer-events="none"/>
+</svg>
+</div>
+
+<div class="bar">
+  <button id="play" type="button">Replay</button>
+  <input id="scrub" type="range" min="0" max="4" step="0.001" value="0" aria-label="Timeline">
+  <span id="time">0.00s</span>
+  <button id="exportBtn" type="button">Export MP4</button>
+</div>
+<p id="status"></p>
+
+<script>
+(() => {
+  "use strict";
+  const DURATION = 4, FPS = 60, W = 1920, H = 1080;
+  const $ = (id) => document.getElementById(id);
+  const S = (id, name, v) => $(id).setAttribute(name, v);
+  const NS = "http://www.w3.org/2000/svg";
+
+  /* ---------- easing ---------- */
+  const clamp = (x) => Math.max(0, Math.min(1, x));
+  const prog = (t, a, b) => clamp((t - a) / (b - a));
+  const smooth = (x) => x * x * (3 - 2 * x);
+  const inOutCubic = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+  const inOutQuint = (x) => (x < 0.5 ? 16 * x ** 5 : 1 - Math.pow(-2 * x + 2, 5) / 2);
+  const outCubic = (x) => 1 - Math.pow(1 - x, 3);
+  const outQuart = (x) => 1 - Math.pow(1 - x, 4);
+  const outExpo = (x) => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x));
+  const inOutSine = (x) => -(Math.cos(Math.PI * x) - 1) / 2;
+  const bump = (t, a, m, b) => (t < a || t > b ? 0 : t < m ? smooth((t - a) / (m - a)) : smooth(1 - (t - m) / (b - m)));
+  const lerp = (a, b, u) => a + (b - a) * u;
+
+  /* ---------- the eclipse ---------- */
+  const RS = 150;
+  const START = { x: 960, y: 470, s: 1 };
+  const END = { x: 806, y: 296, s: 0.6 };
+  const MOON_END = { x: 0.48 * RS, y: -0.31 * RS };
+  const MOON_START = { x: -2.3 * RS, y: 1.45 * RS };
+  const MU = (() => { const d = Math.hypot(MOON_END.x, MOON_END.y); return { x: MOON_END.x / d, y: MOON_END.y / d }; })();
+  const BEAD = { x: -MU.x * RS, y: -MU.y * RS };
+  const HORN = (() => {
+    const d = Math.hypot(MOON_END.x, MOON_END.y), mx = MOON_END.x / 2, my = MOON_END.y / 2;
+    const h = Math.sqrt(RS * RS - (d / 2) ** 2), px = -MU.y, py = MU.x;
+    const a = { x: mx + h * px, y: my + h * py }, b = { x: mx - h * px, y: my - h * py };
+    return a.y < b.y ? a : b;
+  })();
+
+  (() => {
+    const g = $("rays");
+    for (let i = 0; i < 16; i++) {
+      const ang = (i / 16) * 360 + (i % 2 ? 7 : -5);
+      const len = 120 + ((i * 53) % 90);
+      const r = document.createElementNS(NS, "rect");
+      r.setAttribute("x", 150); r.setAttribute("y", -(i % 3 ? 1.6 : 2.6));
+      r.setAttribute("width", len); r.setAttribute("height", i % 3 ? 3.2 : 5.2);
+      r.setAttribute("rx", 2); r.setAttribute("fill", "url(#ray)");
+      r.setAttribute("opacity", (0.35 + ((i * 37) % 50) / 100).toFixed(2));
+      r.setAttribute("transform", `rotate(${ang})`);
+      g.appendChild(r);
+    }
+  })();
+
+  /* ---------- handwritten Sol ---------- */
+  const STROKES = [
+    "M 902 420 C 894 388, 842 374, 800 390 C 754 408, 746 462, 790 492 C 836 524, 902 548, 904 612 " +
+    "C 906 672, 838 712, 770 706 C 726 702, 704 676, 716 650",
+    "M 1000 618 C 980 602, 946 610, 940 646 C 934 684, 962 706, 988 698 C 1014 690, 1024 656, 1012 630 " +
+    "C 1004 614, 988 616, 996 630 C 1008 648, 1040 652, 1066 640 C 1110 620, 1160 520, 1166 450 " +
+    "C 1170 400, 1150 380, 1136 396 C 1116 420, 1112 520, 1116 600 C 1120 670, 1140 704, 1176 702 " +
+    "C 1206 700, 1228 684, 1246 668",
+    "M 704 752 C 860 772, 1110 764, 1296 716"
+  ];
+  const LIFT = 0.06;
+  const SLANT = Math.tan(-11 * Math.PI / 180), PX = 960, PY = 700;
+  ["sig", "sigGlow"].forEach((id) => S(id, "transform", `translate(${PX} ${PY}) skewX(-11) translate(${-PX} ${-PY})`));
+  const slant = (p) => ({ x: p.x + SLANT * (p.y - PY), y: p.y });
+  const strokes = STROKES.map((d) => {
+    const mk = (parent) => { const p = document.createElementNS(NS, "path"); p.setAttribute("d", d); $(parent).appendChild(p); return p; };
+    const path = mk("sig"), glow = mk("sigGlow"), len = path.getTotalLength();
+    [path, glow].forEach((p) => p.setAttribute("stroke-dasharray", len + " " + len));
+    return { path, glow, len };
+  });
+  const LS = strokes.reduce((a, s) => a + s.len, 0);
+  const WRITE_START = 2.1, WRITE_END = 3.35;
+  (() => {
+    const T = WRITE_END - WRITE_START - LIFT * (strokes.length - 1);
+    let at = WRITE_START;
+    strokes.forEach((s) => { s.t0 = at; s.t1 = at + T * s.len / LS; at = s.t1 + LIFT; });
+  })();
+  const pen = (x) => 0.65 * inOutSine(x) + 0.35 * x;
+  const SIG_START = slant(strokes[0].path.getPointAtLength(0));
+
+  function groupAt(t) {
+    const u = inOutQuint(prog(t, 1.62, 2.3));
+    return { x: lerp(START.x, END.x, u), y: lerp(START.y, END.y, u), s: lerp(START.s, END.s, u) };
+  }
+  const toScreen = (g, p) => ({ x: g.x + g.s * p.x, y: g.y + g.s * p.y });
+
+  /* ---------- one frame ---------- */
+  function render(t) {
+    t = Math.max(0, Math.min(DURATION, t));
+    const g = groupAt(t);
+    S("eclipse", "transform", `translate(${g.x.toFixed(2)} ${g.y.toFixed(2)}) scale(${g.s.toFixed(4)})`);
+
+    /* 0.0–0.8  ember swells into the sun */
+    S("ember", "opacity", (smooth(prog(t, 0.0, 0.25)) * (1 - smooth(prog(t, 0.35, 0.55)))).toFixed(3));
+    S("emberGlow", "opacity", (0.7 * smooth(prog(t, 0.0, 0.3)) * (1 - smooth(prog(t, 0.35, 0.6)))).toFixed(3));
+    S("ember", "r", (2.5 + 1.2 * Math.sin(t * 18) * (1 - prog(t, 0, 0.4))).toFixed(2));
+    const grow = outQuart(prog(t, 0.22, 0.85));
+    const r = Math.max(0.01, RS * grow);
+    ["sunDisc", "goldDisc", "sunHaloDisc"].forEach((id) => S(id, "r", r.toFixed(2)));
+    S("sunDisc", "opacity", (smooth(prog(t, 0.22, 0.45)) * (1 - smooth(prog(t, 2.0, 2.6)))).toFixed(3));
+    S("goldDisc", "opacity", smooth(prog(t, 2.0, 2.6)).toFixed(3));
+    S("sunHalo", "opacity", (0.85 * smooth(prog(t, 0.25, 0.7)) * (1 - 0.6 * smooth(prog(t, 2.2, 2.8)))).toFixed(3));
+
+    /* 0.7–1.5  the moon glides across; totality, then it slips toward the crescent */
+    let mx, my;
+    if (t < 1.5) {
+      const u = outCubic(prog(t, 0.7, 1.5));
+      mx = lerp(MOON_START.x, 0, u); my = lerp(MOON_START.y, 0, u);
+    } else {
+      const u = inOutCubic(prog(t, 1.6, 2.3));
+      mx = lerp(0, MOON_END.x, u); my = lerp(0, MOON_END.y, u);
+    }
+    S("moonDisc", "cx", mx.toFixed(2)); S("moonDisc", "cy", my.toFixed(2));
+
+    const total = bump(t, 1.3, 1.52, 1.9);
+    S("coronaGlow", "opacity", (total * 0.95).toFixed(3));
+    S("rim", "opacity", (bump(t, 1.38, 1.52, 1.72) * 0.9).toFixed(3));
+    S("rays", "opacity", (total * 0.75).toFixed(3));
+    S("rays", "transform", `rotate(${(t * 6).toFixed(2)})`);
+    const sky = 0.95 * smooth(prog(t, 0.25, 0.9)) - 0.6 * bump(t, 1.2, 1.5, 1.9) + 0.25 * bump(t, 1.55, 1.68, 2.2);
+    S("skyGlow", "opacity", Math.max(0, Math.min(1, sky - 0.15 * smooth(prog(t, 2.2, 3.0)))).toFixed(3));
+
+    /* 1.5–1.8  diamond-ring flash */
+    const flash = bump(t, 1.56, 1.66, 1.98);
+    S("diamond", "opacity", flash.toFixed(3));
+    S("diamond", "transform", `translate(${BEAD.x.toFixed(2)} ${BEAD.y.toFixed(2)}) scale(${(0.6 + 0.6 * outExpo(prog(t, 1.56, 1.8))).toFixed(3)})`);
+
+    /* 1.92–2.1  a spark leaves the crescent and becomes the pen */
+    const cu = inOutCubic(prog(t, 1.92, WRITE_START));
+    const from = toScreen(g, { x: BEAD.x * 0.92, y: BEAD.y * 0.92 });
+    const ctrl = { x: (from.x + SIG_START.x) / 2 + 40, y: Math.min(from.y, SIG_START.y) - 60 };
+    const q = (u) => ({
+      x: (1 - u) * (1 - u) * from.x + 2 * (1 - u) * u * ctrl.x + u * u * SIG_START.x,
+      y: (1 - u) * (1 - u) * from.y + 2 * (1 - u) * u * ctrl.y + u * u * SIG_START.y
+    });
+    const head = q(cu), tail = q(Math.max(0, cu - 0.22));
+    const cometOn = t >= 1.92 && t < WRITE_START + 0.02 ? smooth(prog(t, 1.92, 1.98)) : 0;
+    S("cometTail", "d", `M ${tail.x.toFixed(2)} ${tail.y.toFixed(2)} Q ${lerp(tail.x, head.x, .5).toFixed(2)} ${lerp(tail.y, head.y, .5).toFixed(2)} ${head.x.toFixed(2)} ${head.y.toFixed(2)}`);
+    S("cometTail", "opacity", (cometOn * 0.85).toFixed(3));
+
+    /* 2.1–3.35  the signature is written */
+    let nib = null, nibOn = 0;
+    if (t >= 1.92 && t < WRITE_START) { nib = head; nibOn = cometOn; }
+    strokes.forEach((st, k) => {
+      const w = pen(prog(t, st.t0, st.t1));
+      const off = (st.len * (1 - w)).toFixed(2);
+      st.path.setAttribute("stroke-dashoffset", off);
+      st.glow.setAttribute("stroke-dashoffset", off);
+      const on = t >= st.t0 && w > 0.0005 ? 1 : 0;
+      st.path.setAttribute("opacity", on);
+      st.glow.setAttribute("opacity", on);
+      if (t >= st.t0 && t <= st.t1) { nib = slant(st.path.getPointAtLength(st.len * w)); nibOn = 1; }
+      else if (k < strokes.length - 1 && t > st.t1 && t < strokes[k + 1].t0) {
+        const a = slant(st.path.getPointAtLength(st.len)), b = slant(strokes[k + 1].path.getPointAtLength(0));
+        const u = inOutSine(prog(t, st.t1, strokes[k + 1].t0));
+        nib = { x: lerp(a.x, b.x, u), y: lerp(a.y, b.y, u) }; nibOn = 0.35;
+      }
+    });
+    S("sigGlow", "opacity", (t >= WRITE_START ? 0.4 + 0.2 * bump(t, 3.5, 3.75, 4.0) : 0).toFixed(3));
+    if (nib) S("nib", "transform", `translate(${nib.x.toFixed(2)} ${nib.y.toFixed(2)})`);
+    S("nib", "opacity", (nibOn * (1 - smooth(prog(t, 3.3, 3.45)))).toFixed(3));
+
+    /* 3.2–3.85  tagline */
+    const tg = outCubic(prog(t, 3.2, 3.85));
+    S("tagline", "opacity", (tg * 0.88).toFixed(3));
+    S("tagline", "letter-spacing", (22 - 9 * tg).toFixed(2));
+    S("tagline", "transform", `translate(0 ${(8 * (1 - tg)).toFixed(2)})`);
+
+    /* 3.5–4.0  a single glint on the crescent tip */
+    const gp = toScreen(g, HORN);
+    const gl = bump(t, 3.5, 3.72, 3.98);
+    S("glint", "opacity", gl.toFixed(3));
+    S("glint", "transform", `translate(${gp.x.toFixed(2)} ${gp.y.toFixed(2)}) rotate(${(15 + 40 * prog(t, 3.5, 4)).toFixed(2)}) scale(${(0.4 + 0.8 * gl).toFixed(3)})`);
+  }
+
+  /* ---------- playback ---------- */
+  const scrub = $("scrub"), timeEl = $("time");
+  let start = 0, playing = false;
+  function frame(now) {
+    if (!playing) return;
+    const t = (now - start) / 1000;
+    render(t);
+    scrub.value = Math.min(t, DURATION);
+    timeEl.textContent = Math.min(t, DURATION).toFixed(2) + "s";
+    if (t < DURATION) requestAnimationFrame(frame); else playing = false;
+  }
+  function play() { start = performance.now(); playing = true; requestAnimationFrame(frame); }
+  $("play").addEventListener("click", play);
+  scrub.addEventListener("input", () => { playing = false; render(+scrub.value); timeEl.textContent = (+scrub.value).toFixed(2) + "s"; });
+
+  /* ---------- frame-exact MP4 export (WebCodecs + mp4-muxer) ---------- */
+  const status = (m) => { $("status").textContent = m; console.log(m); };
+  async function pickCodec() {
+    const tries = [
+      { codec: "avc1.640033", muxer: "avc" },
+      { codec: "avc1.4d0033", muxer: "avc" },
+      { codec: "avc1.42003e", muxer: "avc" },
+      { codec: "vp09.00.40.08", muxer: "vp9" }
+    ];
+    for (const c of tries) {
+      for (const hw of ["prefer-hardware", "prefer-software", "no-preference"]) {
+        const cfg = { codec: c.codec, width: W, height: H, bitrate: 16_000_000, framerate: FPS, hardwareAcceleration: hw };
+        if (c.muxer === "avc") cfg.avc = { format: "avc" };
+        try { if ((await VideoEncoder.isConfigSupported(cfg)).supported) return { cfg, muxer: c.muxer }; } catch (e) {}
+      }
+    }
+    throw new Error("This browser can't encode video (needs Chrome 94+).");
+  }
+  function svgFrameImage() {
+    const xml = new XMLSerializer().serializeToString($("logo"));
+    const url = URL.createObjectURL(new Blob([xml], { type: "image/svg+xml" }));
+    const img = new Image();
+    img.src = url;
+    return img.decode().then(() => { URL.revokeObjectURL(url); return img; });
+  }
+  async function exportMp4() {
+    playing = false;
+    if (typeof VideoEncoder === "undefined") throw new Error("No WebCodecs in this browser.");
+    if (typeof Mp4Muxer === "undefined") throw new Error("mp4-muxer didn't load.");
+    const { cfg, muxer: mc } = await pickCodec();
+    status("Codec: " + cfg.codec + " / " + cfg.hardwareAcceleration);
+    const muxer = new Mp4Muxer.Muxer({
+      target: new Mp4Muxer.ArrayBufferTarget(),
+      video: { codec: mc, width: W, height: H, frameRate: FPS },
+      fastStart: "in-memory"
+    });
+    let failed = null;
+    const enc = new VideoEncoder({ output: (chunk, meta) => muxer.addVideoChunk(chunk, meta), error: (e) => { failed = e; } });
+    enc.configure(cfg);
+    const canvas = document.createElement("canvas");
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    const N = DURATION * FPS;
+    for (let i = 0; i < N; i++) {
+      render(i / FPS);
+      const img = await svgFrameImage();
+      ctx.drawImage(img, 0, 0, W, H);
+      const vf = new VideoFrame(canvas, { timestamp: Math.round(i * 1e6 / FPS), duration: Math.round(1e6 / FPS) });
+      enc.encode(vf, { keyFrame: i % FPS === 0 });
+      vf.close();
+      while (enc.encodeQueueSize > 6) await new Promise((r) => setTimeout(r, 5));
+      if (failed) throw failed;
+      if (i % 20 === 0) status(`Encoding frame ${i + 1} / ${N}…`);
+    }
+    await enc.flush();
+    if (failed) throw failed;
+    muxer.finalize();
+    status(`Done: ${N} frames, ${W}×${H}, ${FPS} fps (${cfg.codec}).`);
+    return new Blob([muxer.target.buffer], { type: "video/mp4" });
+  }
+  $("exportBtn").addEventListener("click", async () => {
+    try {
+      const blob = await exportMp4();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "sol-eclipse-reveal-1080p60.mp4";
+      a.click();
+    } catch (e) { status("Export failed: " + e.message); }
+  });
+
+  const q = new URLSearchParams(location.search);
+  window.SolReveal = { render, exportMp4 };
+  if (q.has("export")) {
+    document.body.classList.add("export");
+    window.__exportState = "running";
+    (async () => {
+      try {
+        const blob = await exportMp4();
+        await fetch("/save?name=sol-eclipse-reveal-1080p60.mp4", { method: "POST", body: blob });
+        render(DURATION);
+        const still = new XMLSerializer().serializeToString($("logo"));
+        await fetch("/save?name=sol-eclipse-final-frame.svg", { method: "POST", body: still });
+        window.__exportState = "done";
+      } catch (e) { window.__exportState = "failed: " + (e && e.message || e); console.error(e); }
+    })();
+  } else if (q.has("t")) {
+    if (q.has("still")) document.body.classList.add("export", "still");
+    render(+q.get("t"));
+    scrub.value = q.get("t");
+  } else {
+    render(0);
+    setTimeout(play, 400);
+  }
+})();
+</script>
+</body>
+</html>

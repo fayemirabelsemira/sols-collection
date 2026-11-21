@@ -1,5 +1,5 @@
 /* =========================================================
-   SOL'S COLLECTION — premium motion layer (GSAP + Lenis)
+   SOL — premium motion layer (GSAP + Lenis)
    Purely additive: never touches Supabase / PayMongo / auth.
    If a CDN script fails to load, the site simply runs as before.
 ========================================================= */
@@ -142,29 +142,16 @@
     try { seen = !!sessionStorage.getItem("sc_intro"); sessionStorage.setItem("sc_intro", "1"); } catch (_) {}
     if (seen) { heroEntrance(); return; }
 
-    const wrap = document.createElement("div");
-    wrap.className = "intro";
-    wrap.innerHTML =
-      '<div class="intro-sun"></div><div class="intro-name" aria-hidden="true">' +
-      "Sol\u2019s Collection".split("").map((c) => '<span><b>' + (c === " " ? "&nbsp;" : c) + "</b></span>").join("") +
-      "</div>";
-    document.body.appendChild(wrap);
-    if (lenis) lenis.stop(); else document.body.style.overflow = "hidden";
-
-    const done = () => {
-      wrap.remove();
-      if (lenis) lenis.start(); else document.body.style.overflow = "";
-    };
-    const letters = $$(".intro-name b", wrap);
-    gsap.set(letters, { yPercent: 110 });
-    const tl = gsap.timeline({ onComplete: done });
-    tl.fromTo(".intro-sun", { scale: 0.5, opacity: 0 }, { scale: 1, opacity: 1, duration: 1.6, ease: "power3.out" }, 0)
-      .to(letters, { yPercent: 0, duration: 1, stagger: 0.04, ease: "power4.out" }, 0.25)
-      .to(letters, { yPercent: -110, duration: 0.7, stagger: 0.025, ease: "power3.in" }, 1.75)
-      .add(heroEntrance, 2.0)
-      .to(wrap, { clipPath: "circle(0% at 50% 50%)", duration: 1.15, ease: "power4.inOut" }, 2.0);
-    wrap.addEventListener("click", () => tl.timeScale(4));
-    setTimeout(() => { if (wrap.isConnected) { tl.progress(1); } }, 7000); // failsafe
+    /* Eclipse Ignition logo reveal (js/intro.js) */
+    if (window.SolIntro) {
+      if (lenis) lenis.stop(); else document.body.style.overflow = "hidden";
+      window.SolIntro.play({
+        onReveal: heroEntrance,
+        onDone: () => { if (lenis) lenis.start(); else document.body.style.overflow = ""; }
+      });
+      return;
+    }
+    heroEntrance();
   }
   runIntro();
 
@@ -229,19 +216,6 @@
       });
     }
   }
-
-  /* ---- Velocity marquee ---- */
-  (function marquee() {
-    const track = $(".cine-marquee-track");
-    if (!track) return;
-    const tween = gsap.to(track, { xPercent: -50, repeat: -1, ease: "none", duration: 38 });
-    let dir = 1, boost = 0;
-    onScrollY((y, v) => {
-      const vel = typeof v === "number" ? v : 0;
-      if (Math.abs(vel) > 0.15) { dir = vel > 0 ? 1 : -1; boost = Math.min(7, Math.abs(vel) * 0.35); }
-    });
-    gsap.ticker.add(() => { boost *= 0.94; tween.timeScale(dir * (1 + boost)); });
-  })();
 
   /* =========================================================
      4. Scroll reveals (static sections)
@@ -335,7 +309,7 @@
   window.addEventListener("load", refreshSoon);
 
   /* =========================================================
-     6. Magnetic buttons + custom cursor
+     6. Magnetic buttons (desktop mouse only)
   ========================================================= */
   if (fine) {
     const MAG = "[data-magnetic], .nav-button.primary, .author-btn.primary, .read-button.large";
@@ -353,27 +327,6 @@
         duration: 0.4, ease: "power3.out", overwrite: "auto"
       });
     });
-
-    // cursor
-    root.classList.add("has-cursor");
-    const dot = document.createElement("div"); dot.className = "cursor-dot";
-    const ring = document.createElement("div"); ring.className = "cursor-ring";
-    document.body.append(ring, dot);
-    const rx = gsap.quickTo(ring, "x", { duration: 0.5, ease: "power3" });
-    const ry = gsap.quickTo(ring, "y", { duration: 0.5, ease: "power3" });
-    const dx = gsap.quickTo(dot, "x", { duration: 0.08 });
-    const dy = gsap.quickTo(dot, "y", { duration: 0.08 });
-    document.addEventListener("pointermove", (e) => { rx(e.clientX); ry(e.clientY); dx(e.clientX); dy(e.clientY); });
-    document.addEventListener("pointerover", (e) => {
-      const t = e.target;
-      if (!t.closest) return;
-      const text = !!t.closest("input,textarea,select,#storyContent");
-      ring.classList.toggle("is-hidden", text); dot.classList.toggle("is-hidden", text);
-      const link = !!t.closest("a,button,[data-magnetic],.genre-card,label,.continue-card");
-      ring.classList.toggle("is-link", link);
-    });
-    document.documentElement.addEventListener("mouseleave", () => { ring.classList.add("is-hidden"); dot.classList.add("is-hidden"); });
-    document.documentElement.addEventListener("mouseenter", () => { ring.classList.remove("is-hidden"); dot.classList.remove("is-hidden"); });
   }
 
   /* =========================================================
@@ -428,7 +381,8 @@
       const t = m.target;
       if (!t.classList) continue;
       const was = (m.oldValue || "").split(/\s+/);
-      if ((t.classList.contains("modal") || t.classList.contains("author-modal")) &&
+      // Writer Studio opens instantly (no slide/blur animation).
+      if (t.classList.contains("modal") && !t.classList.contains("author-modal") &&
           t.classList.contains("active") && !was.includes("active")) {
         openModal(t);
       } else if (t === reader && was.includes("hidden") && !t.classList.contains("hidden")) {

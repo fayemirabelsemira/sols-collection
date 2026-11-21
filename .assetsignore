@@ -10,3 +10,12 @@ node_modules
 *.md
 .gitignore
 .vscode
+.claude
+.DS_Store
+brand
+dist
+optional-share-previews
+tests
+package.json
+package-lock.json
+build.mjs

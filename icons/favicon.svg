@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="708.0 198.0 196.0 196.0">
+<defs>
+  <linearGradient id="solBrand" x1="640" y1="0" x2="1340" y2="0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#ff3d5e"/><stop offset=".38" stop-color="#ffb199"/>
+    <stop offset=".6" stop-color="#ff6a4d"/><stop offset="1" stop-color="#ff9a3c"/>
+  </linearGradient>
+  <linearGradient id="solGold" x1="716.0" y1="206.0" x2="896.0" y2="386.0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#ffe9cc"/><stop offset=".5" stop-color="#ffbe8f"/><stop offset="1" stop-color="#ff8a45"/>
+  </linearGradient>
+  <mask id="solMoon" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080">
+    <rect width="1920" height="1080" fill="#fff"/><circle cx="849.20" cy="268.10" r="90.0" fill="#000"/>
+  </mask></defs>
+<circle cx="806" cy="296" r="90.0" fill="url(#solGold)" mask="url(#solMoon)"/>
+</svg>

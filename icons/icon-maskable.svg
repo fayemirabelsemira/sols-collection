@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="450 -34 1100 1100">
+<defs>
+  <linearGradient id="solBrand" x1="640" y1="0" x2="1340" y2="0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#ff3d5e"/><stop offset=".38" stop-color="#ffb199"/>
+    <stop offset=".6" stop-color="#ff6a4d"/><stop offset="1" stop-color="#ff9a3c"/>
+  </linearGradient>
+  <linearGradient id="solGold" x1="716.0" y1="206.0" x2="896.0" y2="386.0" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#ffe9cc"/><stop offset=".5" stop-color="#ffbe8f"/><stop offset="1" stop-color="#ff8a45"/>
+  </linearGradient>
+  <mask id="solMoon" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080">
+    <rect width="1920" height="1080" fill="#fff"/><circle cx="849.20" cy="268.10" r="90.0" fill="#000"/>
+  </mask>
+  <radialGradient id="solBg" cx="1000" cy="500" r="620" gradientUnits="userSpaceOnUse">
+    <stop offset="0" stop-color="#3a0716"/><stop offset=".55" stop-color="#15070c"/><stop offset="1" stop-color="#070508"/>
+  </radialGradient>
+  <filter id="solGlow" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="14"/></filter>
+</defs>
+<rect x="450" y="-34" width="1100" height="1100" fill="url(#solBg)"/>
+<g filter="url(#solGlow)" opacity=".55"><circle cx="806" cy="296" r="90.0" fill="url(#solGold)" mask="url(#solMoon)"/><g fill="none" stroke="url(#solBrand)" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" transform="translate(960 700) skewX(-11) translate(-960 -700)"><path d="M 902 420 C 894 388, 842 374, 800 390 C 754 408, 746 462, 790 492 C 836 524, 902 548, 904 612 C 906 672, 838 712, 770 706 C 726 702, 704 676, 716 650"/><path d="M 1000 618 C 980 602, 946 610, 940 646 C 934 684, 962 706, 988 698 C 1014 690, 1024 656, 1012 630 C 1004 614, 988 616, 996 630 C 1008 648, 1040 652, 1066 640 C 1110 620, 1160 520, 1166 450 C 1170 400, 1150 380, 1136 396 C 1116 420, 1112 520, 1116 600 C 1120 670, 1140 704, 1176 702 C 1206 700, 1228 684, 1246 668"/><path d="M 704 752 C 860 772, 1110 764, 1296 716"/></g></g>
+<circle cx="806" cy="296" r="90.0" fill="url(#solGold)" mask="url(#solMoon)"/>
+<g fill="none" stroke="url(#solBrand)" stroke-width="24" stroke-linecap="round" stroke-linejoin="round" transform="translate(960 700) skewX(-11) translate(-960 -700)"><path d="M 902 420 C 894 388, 842 374, 800 390 C 754 408, 746 462, 790 492 C 836 524, 902 548, 904 612 C 906 672, 838 712, 770 706 C 726 702, 704 676, 716 650"/><path d="M 1000 618 C 980 602, 946 610, 940 646 C 934 684, 962 706, 988 698 C 1014 690, 1024 656, 1012 630 C 1004 614, 988 616, 996 630 C 1008 648, 1040 652, 1066 640 C 1110 620, 1160 520, 1166 450 C 1170 400, 1150 380, 1136 396 C 1116 420, 1112 520, 1116 600 C 1120 670, 1140 704, 1176 702 C 1206 700, 1228 684, 1246 668"/><path d="M 704 752 C 860 772, 1110 764, 1296 716"/></g>
+</svg>

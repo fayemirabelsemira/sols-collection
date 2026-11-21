@@ -1,4 +1,8 @@
 .env
 .env.local
 .vercel
-.DS_Store.wrangler/
+.DS_Store
+.wrangler/
+dist/
+node_modules/
+.claude/
