@@ -216,3 +216,7 @@ html.has-gsap .modal-box{animation:none}
 /* no animations on the book profile and the homepage author profile */
 #bookModal,#bookModal *,#bookModal *::before,#bookModal *::after,
 #about,#about *,#about *::before,#about *::after{animation:none!important;transition:none!important}
+
+/* no animations on the All Stories grid */
+#booksGrid,#booksGrid *,#booksGrid *::before,#booksGrid *::after{animation:none!important;transition:none!important}
+#booksGrid .book-card{transform:none!important}

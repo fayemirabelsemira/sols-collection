@@ -265,6 +265,7 @@
   const refreshSoon = () => { if (!hasST) return; clearTimeout(refreshT); refreshT = setTimeout(() => ScrollTrigger.refresh(), 350); };
 
   function revealCards(cards) {
+    return;   /* All Stories cards show instantly, no entrance animation */
     if (!cards.length) return;
     if (!hasST) return;
     gsap.set(cards, { opacity: 0, y: 90, scale: 0.95 });
@@ -279,7 +280,7 @@
     revealCards($$(".book-card", grid));
     grid.addEventListener("load", refreshSoon, true);
 
-    if (fine) {
+    if (false) {   /* 3D hover tilt on story cards is switched off */
       let cur = null, raf = 0;
       const reset = () => {
         if (!cur) return;
