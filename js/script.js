@@ -1079,6 +1079,8 @@ async function showBook(bookId) {
 
     currentBook = book;
 
+    countBookClick(book.id);
+
     $("modalBookTitle").textContent = book.title;
 
     $("modalBookAuthor").textContent = `By ${book.author || "Sol"}`;
@@ -1157,7 +1159,7 @@ async function showBook(bookId) {
 
         <span class="modal-stat" title="Views">
             ${ICON_EYE}
-            <strong>${views}</strong>
+            <strong id="modalViewCount">${views}</strong>
         </span>
 
         <span class="modal-stat" title="Votes">
@@ -3251,18 +3253,21 @@ function startViewTimer(chapter) {
         return;
     }
 
+    /* 8 seconds on a chapter counts as reading it (was 30s, so quick
+       readers never counted). Works for guests too. */
     viewTimer = setTimeout(
         async () => {
 
-            if (currentBook && currentUser) {
+            if (!currentBook) return;
 
-                await incrementViews(currentBook.id);
+            /* only a cache so we skip pointless calls; the server decides.
+               Saved only when the call worked, so a failure is retried. */
+            if (await incrementViews(currentBook.id)) {
 
-                /* only a cache so we skip pointless calls; the server decides */
-                localStorage.setItem(key, "true");
+                try { localStorage.setItem(key, "true"); } catch (e) { /* private mode */ }
             }
         },
-        30000
+        8000
     );
 }
 
@@ -3270,43 +3275,96 @@ function startViewTimer(chapter) {
    INCREMENT VIEWS
 ========================================================= */
 
-async function incrementViews(bookId) {
+const viewedThisSession = new Set();
 
-    /* Views are counted once per logged-in reader, enforced by the
-       increment_views() function in Supabase (see sql/01_votes_views.sql). */
-    if (!currentUser) return;
+function deviceId() {
+
+    try {
+
+        let id = localStorage.getItem("sol-device-id");
+
+        if (!id || id.length < 16) {
+
+            id = (crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2) + Date.now()).replace(/-/g, "");
+
+            localStorage.setItem("sol-device-id", id);
+        }
+
+        return id;
+
+    } catch (e) {
+
+        return null;
+    }
+}
+
+/* Returns true when the server counted (or had already counted) the view. */
+async function incrementViews(bookId) {
 
     try {
 
         const book = books.find(b => b.id === bookId);
 
-        if (!book) return;
+        if (!book) return false;
 
-        const { data, error } = await supabaseClient.rpc(
-            "increment_views",
-            { p_book_id: bookId }
-        );
+        let res;
 
-        if (error) {
+        if (currentUser) {
 
-            console.error("View increment error:", error);
+            /* once per logged-in reader per book (sql/01_votes_views.sql) */
+            res = await supabaseClient.rpc("increment_views", { p_book_id: bookId });
 
-            return;
+        } else {
+
+            /* once per device per book (sql/14_guest_views.sql) */
+            const device = deviceId();
+
+            if (!device) return false;
+
+            res = await supabaseClient.rpc("increment_views_guest", { p_book_id: bookId, p_device: device });
         }
 
-        if (data !== null && data !== undefined) {
+        if (res.error) {
 
-            book.views = Number(data) || 0;
+            console.error("View increment error:", res.error);
+
+            return false;
+        }
+
+        if (res.data !== null && res.data !== undefined) {
+
+            book.views = Number(res.data) || 0;
 
             applySort(currentSort);
 
             updateReaderStats(book);
+
+            const modalViews = document.getElementById("modalViewCount");
+
+            if (modalViews && currentBook && currentBook.id === bookId) {
+
+                modalViews.textContent = book.views.toLocaleString();
+            }
         }
+
+        return true;
 
     } catch (err) {
 
         console.error("Failed to increment views:", err);
+
+        return false;
     }
+}
+
+/* a click on a book counts a view once per session */
+function countBookClick(bookId) {
+
+    if (viewedThisSession.has(bookId)) return;
+
+    viewedThisSession.add(bookId);
+
+    incrementViews(bookId).then(ok => { if (!ok) viewedThisSession.delete(bookId); });
 }
 
 /* =========================================================
