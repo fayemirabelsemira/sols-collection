@@ -2066,7 +2066,7 @@ async function loadChapterContent(chapter) {
 
         if (heading) {
 
-            heading.textContent = chapterLabel(loadedChapter);
+            heading.textContent = chapterFullTitle(loadedChapter);
         }
 
         const numberElement = $("readerChapterNumber");
@@ -2168,7 +2168,7 @@ function renderChapter(chapter) {
     }
 
     if ($("chapterHeading")) {
-        $("chapterHeading").textContent = chapterLabel(chapter);
+        $("chapterHeading").textContent = chapterFullTitle(chapter);
     }
 
     if ($("readerChapterTitle")) {

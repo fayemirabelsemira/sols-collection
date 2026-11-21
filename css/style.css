@@ -242,7 +242,7 @@ a{color:inherit;text-decoration:none}
 .story-header{text-align:center;margin-bottom:50px;padding-bottom:30px;border-bottom:1px solid var(--border);position:relative}
 .story-header::after{content:"✦";position:absolute;left:50%;bottom:-11px;transform:translateX(-50%);background:var(--obsidian);color:var(--gold);padding:0 14px;font-size:16px}
 .reader-category{color:var(--gold);font-size:11px;letter-spacing:.22em;font-weight:600;text-transform:uppercase}
-.story-header h1{font:600 clamp(32px,5vw,54px)/1.15 var(--font-display);letter-spacing:.05em;color:var(--gold-hi);margin:12px 0}
+.story-header h1{font:600 clamp(32px,5vw,54px)/1.15 var(--font-display);letter-spacing:.05em;color:#fff;margin:12px 0}
 .reader-stats{display:flex;justify-content:center;gap:20px;font-size:13px;color:var(--muted)}
 .story-content{font:400 18px/2 var(--font-ui);color:#e9e6e0;white-space:pre-wrap;word-wrap:break-word;transition:font-size .2s ease}
 .story-content p{margin-bottom:1.5em}
@@ -1409,11 +1409,11 @@ body{overflow-x:clip}               /* safety net only — nothing should overfl
   width:100%;box-sizing:border-box;margin:.3em 0 .1em;padding:.2em .2em .1em;text-align:center;white-space:normal;text-wrap:balance;
   font-family:"Playfair Display","Cormorant Garamond",Georgia,"Times New Roman",serif!important;
   font-style:italic;font-weight:800;font-size:1.4em;line-height:1.2;letter-spacing:.005em;
-  color:color-mix(in srgb,#ff6a4d 70%,currentColor);
+  color:#fff;
 }
 .pov-line::after{
   content:"";display:block;width:72px;height:2px;margin-top:.32em;border-radius:2px;
-  background:linear-gradient(90deg,transparent,#ff6a4d,transparent);
+  background:linear-gradient(90deg,transparent,#fff,transparent);
 }
 .scene-break{
   display:inline-flex;align-items:center;justify-content:center;gap:.9em;vertical-align:top;
