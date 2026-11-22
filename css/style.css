@@ -1419,16 +1419,13 @@ body{overflow-x:clip}               /* safety net only — nothing should overfl
   display:inline-flex;align-items:center;justify-content:center;gap:.9em;vertical-align:top;
   width:100%;box-sizing:border-box;margin:.35em 0;white-space:normal;text-align:center;
   font-family:"Playfair Display",Georgia,serif!important;font-style:normal;font-weight:800;font-size:1.7em;line-height:1;
-  letter-spacing:.45em;text-indent:.45em;color:color-mix(in srgb,#ff6a4d 80%,currentColor);
-  text-shadow:0 0 18px rgba(255,106,77,.55);
+  letter-spacing:.45em;text-indent:.45em;color:#000;
+  text-shadow:none;
 }
 .scene-break::before,.scene-break::after{
   content:"";flex:1;max-width:28%;height:1px;opacity:.75;
-  background:linear-gradient(90deg,transparent,#ff6a4d);
+  background:linear-gradient(90deg,transparent,#000);
 }
-.scene-break::after{background:linear-gradient(270deg,transparent,#ff6a4d)}
-#readerSection[data-reader-theme="white"] .scene-break,
-#readerSection[data-reader-theme="beige"] .scene-break,
-#readerSection[data-reader-theme="paper"] .scene-break,
-#readerSection[data-reader-theme="rose"] .scene-break{color:#9d1236;text-shadow:none}
+.scene-break::after{background:linear-gradient(270deg,transparent,#000)}
+
 
