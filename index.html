@@ -93,6 +93,30 @@
   <a href="#books" class="cine-scroll" aria-label="Scroll to books"><span></span>Scroll</a>
 </section>
 
+<!-- CONTINUE READING (first for returning readers; hidden until they've started a book) -->
+<section id="continueReading" class="section continue-section hidden">
+  <div class="section-heading">
+    <p class="section-label">YOUR READING JOURNEY</p>
+    <h2>Continue Reading</h2>
+  </div>
+  <div id="continueCard" class="continue-card">
+    <div id="continueCover" class="continue-cover"><span>SC</span></div>
+    <div class="continue-information">
+      <p class="continue-label">CURRENTLY READING</p>
+      <h3 id="continueTitle">Vengeance Resurrection</h3>
+      <p id="continueChapter">Chapter 1</p>
+      <div class="progress-container">
+        <div id="continueProgress" class="progress-bar" style="width: 0%"></div>
+      </div>
+      <div class="progress-information">
+        <span id="progressPercent">0%</span>
+        <span id="progressNumbers">1 / 49</span>
+      </div>
+      <button id="continueButton" class="read-button" type="button">Continue Reading</button>
+    </div>
+  </div>
+</section>
+
 <!-- BOOKS -->
 <section id="books" class="section books-section">
   <div class="section-heading books-heading">
@@ -116,29 +140,7 @@
   <div id="booksEmpty" class="empty-message hidden">No books are available yet.</div>
 </section>
 
-<!-- CONTINUE READING -->
-<section id="continueReading" class="section continue-section">
-  <div class="section-heading">
-    <p class="section-label">YOUR READING JOURNEY</p>
-    <h2>Continue Reading</h2>
-  </div>
-  <div id="continueCard" class="continue-card">
-    <div id="continueCover" class="continue-cover"><span>SC</span></div>
-    <div class="continue-information">
-      <p class="continue-label">CURRENTLY READING</p>
-      <h3 id="continueTitle">Vengeance Resurrection</h3>
-      <p id="continueChapter">Chapter 1</p>
-      <div class="progress-container">
-        <div id="continueProgress" class="progress-bar" style="width: 0%"></div>
-      </div>
-      <div class="progress-information">
-        <span id="progressPercent">0%</span>
-        <span id="progressNumbers">1 / 49</span>
-      </div>
-      <button id="continueButton" class="read-button" type="button">Continue Reading</button>
-    </div>
-  </div>
-</section>
+
 
 <!-- GENRES -->
 </main>

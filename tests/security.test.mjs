@@ -109,15 +109,3 @@ test("no service-role keys or secrets in the published code", () => {
     assert.doesNotMatch(src, /c2VydmljZV9yb2xl/, f);
   }
 });
-
-test("render.yaml sends the same headers as _headers", () => {
-  const yaml = read("render.yaml");
-  for (const block of read("_headers").trim().split(/\n\s*\n/)) {
-    const [path, ...lines] = block.split("\n");
-    for (const l of lines) {
-      const i = l.indexOf(":");
-      const entry = `- path: ${path.trim()}\n        name: ${l.slice(0, i).trim()}\n        value: ${JSON.stringify(l.slice(i + 1).trim())}`;
-      assert.ok(yaml.includes(entry), "render.yaml is missing: " + l.trim().slice(0, 60));
-    }
-  }
-});

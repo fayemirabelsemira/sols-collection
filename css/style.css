@@ -1405,28 +1405,32 @@ body{overflow-x:clip}               /* safety net only — nothing should overfl
 .social-btn:hover{border-color:var(--gold);box-shadow:0 0 0 3px rgba(255,106,77,.15)}
 
 /* ---- chapter POV headings and *** scene breaks ---- */
+/* black on light pages, white on dark ones (black on a dark page is invisible) */
+#readerSection{--pov-ink:#fff}
+#readerSection[data-reader-theme="white"],#readerSection[data-reader-theme="beige"],
+#readerSection[data-reader-theme="paper"],#readerSection[data-reader-theme="rose"]{--pov-ink:#000}
 .pov-line{
   display:inline-flex;flex-direction:column;align-items:center;justify-content:center;vertical-align:top;
   width:100%;box-sizing:border-box;margin:.3em 0 .1em;padding:.2em .2em .1em;text-align:center;white-space:normal;text-wrap:balance;
   font-family:"Playfair Display","Cormorant Garamond",Georgia,"Times New Roman",serif!important;
   font-style:italic;font-weight:800;font-size:1.4em;line-height:1.2;letter-spacing:.005em;
-  color:#000;
+  color:var(--pov-ink,currentColor);
 }
 .pov-line::after{
   content:"";display:block;width:72px;height:2px;margin-top:.32em;border-radius:2px;
-  background:linear-gradient(90deg,transparent,#000,transparent);
+  background:linear-gradient(90deg,transparent,var(--pov-ink,currentColor),transparent);
 }
 .scene-break{
   display:inline-flex;align-items:center;justify-content:center;gap:.9em;vertical-align:top;
   width:100%;box-sizing:border-box;margin:.35em 0;white-space:normal;text-align:center;
   font-family:"Playfair Display",Georgia,serif!important;font-style:normal;font-weight:800;font-size:1.7em;line-height:1;
-  letter-spacing:.45em;text-indent:.45em;color:#000;
+  letter-spacing:.45em;text-indent:.45em;color:var(--pov-ink,currentColor);
   text-shadow:none;
 }
 .scene-break::before,.scene-break::after{
   content:"";flex:1;max-width:28%;height:1px;opacity:.75;
-  background:linear-gradient(90deg,transparent,#000);
+  background:linear-gradient(90deg,transparent,var(--pov-ink,currentColor));
 }
-.scene-break::after{background:linear-gradient(270deg,transparent,#000)}
+.scene-break::after{background:linear-gradient(270deg,transparent,var(--pov-ink,currentColor))}
 
 

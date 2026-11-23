@@ -851,3 +851,14 @@ html.sol-intro-wait body>*:not(.sol-intro){visibility:hidden}
 .comment-guest-name{flex:1 1 140px;min-width:0;height:36px;padding:0 14px;border:0;border-radius:18px;background:rgba(127,127,127,.14);color:var(--ivory);font:inherit;font-size:16px}
 .comment-guest-name:focus-visible{outline:2px solid #e8113f;outline-offset:1px}
 .comment-guest .sol-link{font-size:12px}
+
+/* "Start Reading": light text on the dark red button (dark text was hard to read) */
+.read-button.large{color:#fff}
+.read-button.large:hover{color:#1a0a06}
+
+/* chapter menu: titles wrap to two lines instead of being cut off */
+.chapter-item .chapter-title{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.3}
+.chapter-item .chapter-number{flex-shrink:0}
+/* light reading pages: the chapter menu was still dark, so its dark titles were invisible */
+#readerSection[data-reader-theme="white"] .chapter-sidebar,#readerSection[data-reader-theme="beige"] .chapter-sidebar,
+#readerSection[data-reader-theme="paper"] .chapter-sidebar,#readerSection[data-reader-theme="rose"] .chapter-sidebar{background:var(--surface)}

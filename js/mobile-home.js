@@ -64,8 +64,8 @@
     if (filtering) return;
     const num = (b, k) => Number(b[k]) || 0;
     const popular = [...books].sort((a, b) => num(b, 'views') - num(a, 'views')).slice(0, 10);
-    const voted = [...books].sort((a, b) => num(b, 'votes') - num(a, 'votes')).slice(0, 10);
-    shelfHost.append(shelf('Most popular', popular), shelf('Top voted', voted));
+    // one shelf only: a "Top voted" shelf listed the same books again
+    shelfHost.append(shelf('Most popular', popular));
     const all = document.createElement('h3'); all.className = 'm-shelf-title'; all.textContent = 'All stories';
     shelfHost.appendChild(all);
   }

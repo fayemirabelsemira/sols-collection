@@ -1482,9 +1482,11 @@ async function loadChapterList() {
                         : `<span class="chapter-title">${escapeHtml(rawTitle)}</span>`
                 }
 
-                <span class="chapter-price ${isFree ? "free" : "paid"}${!isFree && isChapterMarkedUnlocked(chapter) ? " unlocked" : ""}">
-                    ${accessLabel}
-                </span>
+                ${
+                    isFree
+                        ? "" /* no badge on free chapters: most are free, so it was just noise */
+                        : `<span class="chapter-price paid${isChapterMarkedUnlocked(chapter) ? " unlocked" : ""}">${accessLabel}</span>`
+                }
 
             `;
 
@@ -2824,6 +2826,7 @@ function renderContinue(state) {
     const percent = hasProgress ? Math.min(100, Math.max(0, Number(state.percent) || 0)) : 0;
 
     continueState = hasProgress ? { ...state, book } : null;
+    $("continueReading")?.classList.toggle("hidden", !hasProgress);
 
     const preview = $("continuePreview");
 
