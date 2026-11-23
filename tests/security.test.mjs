@@ -73,6 +73,7 @@ test("SOL-02 every CDN script has SRI and crossorigin", () => {
   const tags = html.match(/<script[^>]+src="https?:[^"]+"[^>]*>/g) || [];
   assert.ok(tags.length >= 5);
   for (const t of tags) {
+    if (t.includes("static.cloudflareinsights.com/beacon.min.js")) continue; // Cloudflare updates it in place, so it can't be pinned
     assert.match(t, /integrity="sha384-[A-Za-z0-9+/=]{64}"/, t);
     assert.match(t, /crossorigin="anonymous"/, t);
   }
@@ -86,7 +87,7 @@ test("SOL-02 CSP allows only the pinned library folders", () => {
   assert.ok(!scriptSrc.some((s) => /unsafe-inline|unsafe-eval|\*/.test(s)));
   const html = read("index.html");
   for (const [, url] of html.matchAll(/<script[^>]+src="(https?:[^"]+)"/g)) {
-    assert.ok(scriptSrc.some((s) => s.endsWith("/") && url.startsWith(s)), url + " allowed by CSP");
+    assert.ok(scriptSrc.some((s) => s === url || (s.endsWith("/") && url.startsWith(s))), url + " allowed by CSP");
   }
   for (const h of ["X-Content-Type-Options: nosniff", "X-Frame-Options: DENY", "Strict-Transport-Security", "frame-ancestors 'none'", "object-src 'none'"]) {
     assert.ok(headers.includes(h), h);
@@ -106,5 +107,17 @@ test("no service-role keys or secrets in the published code", () => {
     assert.doesNotMatch(src, /service_role|sb_secret_|sk_live_|sk_test_|whsec_|PAYMONGO_SECRET/i, f);
     /* the old JWT-style keys: a service-role JWT carries "role":"service_role" (base64 c2VydmljZV9yb2xl) */
     assert.doesNotMatch(src, /c2VydmljZV9yb2xl/, f);
+  }
+});
+
+test("render.yaml sends the same headers as _headers", () => {
+  const yaml = read("render.yaml");
+  for (const block of read("_headers").trim().split(/\n\s*\n/)) {
+    const [path, ...lines] = block.split("\n");
+    for (const l of lines) {
+      const i = l.indexOf(":");
+      const entry = `- path: ${path.trim()}\n        name: ${l.slice(0, i).trim()}\n        value: ${JSON.stringify(l.slice(i + 1).trim())}`;
+      assert.ok(yaml.includes(entry), "render.yaml is missing: " + l.trim().slice(0, 60));
+    }
   }
 });

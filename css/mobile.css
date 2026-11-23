@@ -134,11 +134,11 @@ html.m-menu-open,html.m-menu-open body{overflow:hidden}
 .reader-topbar{position:relative;min-height:56px;padding-top:env(safe-area-inset-top,0px)}
 .reader-back-button{min-height:44px;padding:0 12px}
 .m-reader-bar{display:block;position:absolute;left:0;right:0;bottom:-1px;height:2px;overflow:hidden;pointer-events:none;background:rgba(255,255,255,.06)}
-.m-reader-bar i{display:block;height:100%;transform:scaleX(0);transform-origin:0 50%;background:var(--brushed);box-shadow:0 0 10px rgba(255,106,77,.6)}
+.m-reader-bar i{display:block;height:100%;transform:scaleX(0);transform-origin:0 50%;background:var(--ivory);box-shadow:none}   /* black on light pages, white on dark */
 .reader-toolbar{padding:8px var(--m-r) 8px var(--m-l)}
 .toolbar-btn,.font-select{min-height:40px}
 .story-reader{padding:28px max(20px,var(--m-r)) calc(96px + env(safe-area-inset-bottom,0px)) max(20px,var(--m-l))}
-.story-header h1{font-size:clamp(28px,8vw,36px);line-height:1.12}
+.story-header h1{font-size:clamp(20px,6vw,24px);line-height:1.2}
 .story-content{hyphens:auto;overflow-wrap:break-word;text-wrap:pretty}
 .reader-nav-button{min-height:54px;border-radius:999px}
 
@@ -206,9 +206,10 @@ html.m-menu-open,html.m-menu-open body{overflow:hidden}
 .m-top,.m-tabbar,.m-shelves{display:none}
 @media(max-width:700px){
   /* top: search + genre chips */
-  .m-top{display:block;position:relative;z-index:3;padding:calc(var(--header-h) + env(safe-area-inset-top,0px) + 10px) var(--gutter) 4px}
+  /* search sits in the header row, beside the ☰ button (44px + gap), instead of under an empty row */
+  .m-top{display:block;position:relative;z-index:3;padding:calc(env(safe-area-inset-top,0px) + 7px) var(--gutter) 4px}
   .m-top[hidden]{display:none}
-  .m-top .search-box{width:100%;max-width:none}
+  .m-top .search-box{width:calc(100% - 52px);max-width:none}
   .m-top .search-box input{height:44px;padding:0 48px 0 16px;border-radius:12px;font-size:16px}
   .m-top .genres-grid{display:flex;gap:8px;overflow-x:auto;margin:10px calc(var(--gutter)*-1) 0;padding:0 var(--gutter) 4px;
     scrollbar-width:none;-webkit-overflow-scrolling:touch}
@@ -278,7 +279,7 @@ html.m-menu-open,html.m-menu-open body{overflow:hidden}
     overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
   .reader-progress-top{display:none}              /* progress = the thin line under the bar */
   .reader-topbar .reader-toolbar-inner{display:flex;flex:0 0 auto;align-items:center;gap:0;overflow:visible;margin:0;padding:0}
-  .reader-topbar .reader-toolbar-inner>.toolbar-group,.reader-toolbar-inner>.rc-open,#cxCastBtn,#rcBtn{display:none!important}
+  .reader-topbar .reader-toolbar-inner>.toolbar-group,.reader-toolbar-inner>.rc-open,#cxTreeBtn,#rcBtn{display:none!important}
 
   /* quiet icon buttons: no boxes */
   .reader-topbar .reader-toolbar-inner .toolbar-btn{display:inline-flex;align-items:center;justify-content:center;
@@ -389,3 +390,4 @@ html.m-menu-open,html.m-menu-open body{overflow:hidden}
   #readerSection.focus-mode .focus-toggle{--ft-icon:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='M4 7h16M4 12h16M4 17h16'/%3E%3C/svg%3E")}
   .focus-toggle:active{opacity:1;transform:scale(.94)}
 }
+

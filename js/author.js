@@ -308,7 +308,7 @@
     if (!user) throw new Error("Log in first.");
     if (!file || !/^image\/(jpeg|png|webp|gif|avif|heic|heif)$/i.test(file.type || "")) throw new Error("Choose a JPG, PNG or WebP image.");
     if (file.size > IMG_MAX_BYTES) throw new Error("That image is over 10 MB.");
-    var blob = await shrinkImage(file, kind === "cover" ? 1200 : 1600);
+    var blob = await shrinkImage(file, kind === "cover" ? 1200 : kind === "character" ? 800 : 1600);
     var ext = blob.type === "image/webp" ? "webp" : "jpg";
     var path = user.id + "/" + kind + "/" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8) + "." + ext;
     var up = await sb.storage.from(IMG_BUCKET).upload(path, blob, { contentType: blob.type, cacheControl: "31536000", upsert: false });
@@ -505,6 +505,7 @@
     setTitle(book ? book.title : "Chapters");
     headActions(
       '<button type="button" class="author-btn ghost" data-action="back-books">← Novels</button>' +
+        '<button type="button" class="author-btn ghost" data-action="open-characters">Characters</button>' +
         '<button type="button" class="author-btn primary" data-action="new-chapter">+ New chapter</button>'
     );
     bodyEl.innerHTML = '<p class="author-loading">Loading chapters…</p>';
@@ -912,6 +913,51 @@
     });
   }
 
+  /* text emojis for the chapter editor; keys are what ":word" matches */
+  var KAOMOJI = [
+    { name: "Happy", keys: ["happy", "smile", "glad", "joy"], faces: ["(◕‿◕)", "(＾▽＾)", "٩(◕‿◕)۶", "(✿◠‿◠)", "ヽ(・∀・)ﾉ", "(≧◡≦)", "(´｡• ᵕ •｡`)", "(*^‿^*)", "(◠‿◠)", "(⌒‿⌒)", "(｡◕‿◕｡)", "(*≧ω≦*)", "(ᵔᴥᵔ)", "( ˘ᵕ˘ )", "(っ＾▿＾)", "(o^▽^o)"] },
+    { name: "Yay", keys: ["yay", "dance", "party", "excited", "celebrate", "win"], faces: ["＼(＾▽＾)／", "ヾ(＾∇＾)", "♪┏(・o･)┛♪", "┗(＾0＾)┓", "٩(ˊᗜˋ*)و", "ヽ(°〇°)ﾉ", "(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧", "o(≧▽≦)o", "＼(≧▽≦)／", "ᕕ( ᐛ )ᕗ", "(ﾉ´ヮ`)ﾉ*: ･ﾟ", "♪(´▽｀)", "└(＾＾)┐", "ヘ(￣ー￣ヘ)"] },
+    { name: "Love", keys: ["love", "heart", "kiss", "crush", "adore"], faces: ["(♡˙︶˙♡)", "(｡♥‿♥｡)", "(˘³˘)♥", "♡(ˆ⌣ˆ)", "(づ｡◕‿‿◕｡)づ", "(´∀｀)♡", "(◍•ᴗ•◍)❤", "(≧◡≦) ♡", "(*˘︶˘*).｡.:*♡", "( ˘ ³˘)♥", "(灬º‿º灬)♡", "♡( ◡‿◡ )", "(っ˘з(˘⌣˘ )", "(˶˘ ³˘)♡", "ʚ♡ɞ", "(๑˃ᴗ˂)ﻭ♡"] },
+    { name: "Shy", keys: ["shy", "blush", "flustered", "embarrassed"], faces: ["(⁄ ⁄•⁄ω⁄•⁄ ⁄)", "(〃▽〃)", "(*/ω＼)", "(˶ᵔ ᵕ ᵔ˶)", "(//▽//)", "(*ﾉωﾉ)", "(„ಡωಡ„)", "(〃ω〃)", "(⁄ ⁄>⁄ ▽ ⁄<⁄ ⁄)", "(*/_＼)", "(๑•́ ₃ •̀๑)", "(〃＞＿＜;〃)"] },
+    { name: "Sad", keys: ["sad", "cry", "tears", "hurt", "sorry", "heartbroken"], faces: ["(╥﹏╥)", "(｡•́︿•̀｡)", "(ಥ﹏ಥ)", "(ㅠ﹏ㅠ)", "(っ˘̩╭╮˘̩)っ", "(T_T)", "(;﹏;)", "(｡╯︵╰｡)", "(ノ_<。)", "(´；ω；`)", "( ´_ゝ`)", "(〒﹏〒)", "(个_个)", "(ಥ_ಥ)", "(｡ŏ﹏ŏ)", "(╯︵╰,)"] },
+    { name: "Angry", keys: ["angry", "mad", "rage", "flip", "table", "annoyed"], faces: ["(╯°□°)╯︵ ┻━┻", "(ಠ_ಠ)", "(｀Д´)", "ヽ(`⌒´メ)ノ", "٩(╬ʘ益ʘ╬)۶", "(ノಠ益ಠ)ノ彡┻━┻", "┬─┬ノ( º _ ºノ)", "(＃`Д´)", "(҂ `з´ )", "(╬ Ò﹏Ó)", "(ꐦ°᷄д°᷅)", "(눈_눈)", "(¬_¬\")", "(ง •̀_•́)ง"] },
+    { name: "Shocked", keys: ["shock", "omg", "wow", "surprised", "gasp"], faces: ["(⊙_⊙)", "(°ロ°)", "Σ(°△°|||)", "(O_O;)", "ʘ‿ʘ", "(゜゜)", "Σ(ﾟДﾟ)", "(°o°)", "(⊙０⊙)", "w(°ｏ°)w", "(ㆆ_ㆆ)", "(●__●)", "Σ(っ°Д°;)っ"] },
+    { name: "Scared", keys: ["scared", "nervous", "fear", "panic", "worried"], faces: ["(ﾉ´ｰ`)ﾉ", "(;;;*_*)", "〣( ºΔº )〣", "(((;ꏿ_ꏿ;)))", "(°ㅂ°╬)", "ヽ(°〇°)ﾉ", "(ﾟДﾟ;≡;ﾟДﾟ)", "(⊙﹏⊙;)", "(´°ω°`)", "(・_・;)"] },
+    { name: "Confused", keys: ["confused", "huh", "hmm", "think"], faces: ["(・・ ) ?", "(⊙_☉)", "(◎ ◎)ゞ", "(。・ω・。)?", "(￣～￣;)", "(・_・ヾ", "( ˘･з･)?", "(〃￣ω￣〃ゞ", "┐( ˘_˘ )┌", "(゜-゜)"] },
+    { name: "Awkward", keys: ["awkward", "cringe", "oops", "sweat", "nervous"], faces: ["(^_^;)", "(￣▽￣;)", "(・_・;)", "(°ー°〃)", "(⌒_⌒;)", "(-_-;)", "(；一_一)", "(￣ω￣;)", "(＾▽＾;)", "(ー_ー;)", "(｡•́‿•̀｡);", "(¬_¬;)", "(ᵕ—ᴗ—)", "(ˊ_>ˋ)", "(•ᴗ•;)", "(๑•﹏•)", "(≖_≖ )", "( ˙꒳˙ ;)", "(￣～￣;)", "(´-ω-`;)ゞ"] },
+    { name: "Lost", keys: ["lost", "where", "blank", "dazed", "spaced"], faces: ["(・・;)ゞ", "(゜。゜)", "(◎_◎;)", "( ˙_˙ )", "(⊙_◎)", "(。_。)", "(´・_・`)", "(・_・?)", "( ⚆ _ ⚆ )", "(°_°)", "( ‘д‘ ⊂彡☆))Д´)", "(@_@)", "(ーー;)?", "(o_O)", "( ._.)", "(・ω・)?"] },
+    { name: "Laughing", keys: ["laugh", "lol", "haha", "lmao", "funny"], faces: ["(≧▽≦)", "(*≧▽≦)ﾉｼ))", "(ﾉ≧∀≦)ﾉ", "( ´∀｀)ﾉ彡", "(^▽^)", "(o≧▽≦o)", "(⌒▽⌒)☆", "(＾∀＾●)ﾉｼ", "ヽ(>∀<☆)ノ", "(ノ´ヮ´)ノ*:･ﾟ✧", "(≧∇≦)/", "(*´▽`*)"] },
+    { name: "Silly", keys: ["silly", "tease", "playful", "tongue", "derp"], faces: ["(￣ε￣)", "( ˙▿˙ )", "(｡>ω<｡)", "(・`ω´・)", "(｡•̀ᴗ-)✧", "(ᗒᗨᗕ)", "( ᐛ )", "(￢з￢)", "(∩˃o˂∩)♡", "( ͡ᵔ ͜ʖ ͡ᵔ )", "ᕕ(⌐■_■)ᕗ ♪♬", "(´ε｀ )"] },
+    { name: "Pout", keys: ["pout", "sulk", "hmph", "grumpy", "jealous"], faces: ["(￣^￣)", "(｀ε´)", "(・ε・)", "(╯3╰)", "(¬､¬)", "(〃＞＿＜;〃)", "(￣ヘ￣)", "( ｰ̀εｰ́ )", "(´-ε-｀)", "(¬_¬)ﾉ", "(눈‸눈)", "( •ˋ _ ˊ• )"] },
+    { name: "Lonely", keys: ["lonely", "alone", "miss", "empty", "longing"], faces: ["(っ- ‸ – ς)", "(´・ω・`)", "( ´•︵•` )", "(._.)", "(ᵕ̣̣̣̣̣̣﹏ᵕ̣̣̣̣̣̣)", "(｡•́︿•̀｡)", "(´-﹏-`；)", "( ˘︹˘ )", "(︶︹︺)", "(⌯˃̶᷄ ﹏ ˂̶᷄⌯)", "(っ˘̩╭╮˘̩)っ", "( . .)φ"] },
+    { name: "Disappointed", keys: ["disappointed", "letdown", "ugh", "sigh", "meh"], faces: ["(￣_￣)", "(－‸ლ)", "(´ー`)", "(ー_ー゛)", "(-_-)", "(¯―¯٥)", "( ´_ゝ`)", "(=_=)", "(；￣Д￣)", "(◞‸◟)", "(ಠ‿ಠ)", "(￣ヘ￣;)"] },
+    { name: "Frustrated", keys: ["frustrated", "stressed", "argh", "overwhelmed", "done"], faces: ["(╯‵□′)╯", "(ノ｀Д)ノ", "(＃＞＜)", "(ﾉ°益°)ﾉ", "(-_-メ)", "ヽ(ｏ`皿′ｏ)ﾉ", "(っ °Д °;)っ", "(×﹏×)", "(°□°;)", "(ﾉ`□´)ﾉ⌒┻━┻", "(ಥ﹏ಥ)彡", "(>_<)"] },
+    { name: "Guilty", keys: ["guilty", "regret", "ashamed", "oops", "mybad"], faces: ["(シ. .)シ", "(〃´∀`)ゞ", "(；´д｀)ゞ", "(._.`)", "(◞‸◟；)", "(つ﹏⊂)", "(ノдヽ)", "(´._.`)", "(｡ノω＼｡)", "(/ω＼)", "(・人・)", "(￣▽￣*)ゞ"] },
+    { name: "Disgusted", keys: ["disgusted", "gross", "ew", "eww", "yuck"], faces: ["(￣ヘ￣;)", "(⇀‸↼‶)", "(；￣Д￣)", "(ಠ_ಠ)>⌐■-■", "(・ัω・ั)", "( ° ʖ °)", "(╯ರ ~ ರ)╯", "(ꐦ ಠ皿ಠ )", "(´〜｀*)", "(눈_눈)", "(◉_◉)", "( ⚆ ﹏ ⚆ )"] },
+    { name: "Curious", keys: ["curious", "peek", "look", "watching", "interested"], faces: ["(・ω・)", "|ω・)", "|д･)", "┬┴┬┴┤･ω･)ﾉ", "(￣ω￣)?", "(⊙ω⊙)", "( •̀ .̫ •́ )", "( ˘ ³˘)?", "(・o・)", "(｡•̀ᴗ-)✧", "(•ิ_•ิ)?", "|・ω・｀)"] },
+    { name: "Hopeful", keys: ["hope", "hopeful", "wish", "pray", "dream"], faces: ["(人´∀`)", "(✿ ♡‿♡)", "(✧ω✧)", "(*´∀`)人", "(人 •͈ᴗ•͈)", "( ˘͈ ᵕ ˘͈♡)", "☆(ゝω・)v", "(⁎˃ᴗ˂⁎)", "(｡♡‿♡｡)", "(◕ᴗ◕✿)", "(人◕‿◕)", "✧(•̀ᴗ•́)و"] },
+    { name: "Grateful", keys: ["grateful", "thankful", "blessed", "appreciate"], faces: ["(人´ω｀*)", "(*´∀`)ノ♡", "(ღ˘⌣˘ღ)", "(つ≧▽≦)つ♡", "(◍•ᴗ•◍)♡ ✧*。", "(*˘︶˘*)♡", "(≧◡≦) ♡", "(´ ∀ ` *)", "(っ´ω`)ﾉ♡", "(*_ _)人", "(´｡• ᵕ •｡`) ♡", "( ◡‿◡ *)"] },
+    { name: "Calm", keys: ["calm", "relieved", "peace", "relax", "chill"], faces: ["(￣▽￣)", "( ˘ω˘ )", "(︶▽︶)", "(ᴗ_ ᴗ。)", "(´ー｀)", "( ´ ▽ ` )", "(-‿-)", "(︶ω︶)", "(◡ ω ◡)", "( ˘ᵕ˘ )", "(´∀`)ﾌｩ", "(*￣▽￣)b"] },
+    { name: "Determined", keys: ["determined", "motivated", "fighting", "go", "focus"], faces: ["(ง'̀-'́)ง", "( •̀ᄇ• ́)ﻭ✧", "(๑•̀ㅂ•́)و✧", "ᕦ(ò_óˇ)ᕤ", "(•̀o•́)ง", "٩(๑•̀o•́๑)و", "(｀・ω・´)", "(ง •̀_•́)ง", "ᕙ(`▽´)ᕗ", "( •̀ω•́ )✧", "(￣^￣)ゞ", "(•̀ᴗ•́)و"] },
+    { name: "Proud", keys: ["proud", "smug", "nailed", "flex"], faces: ["(￣ー￣)ｂ", "(￣^￣)", "( ￣▽￣)b", "(⌐■_■)b", "ᕦ(ò_óˇ)ᕤ", "(*￣▽￣)b", "(￣ω￣)/", "( ˘ ▽ ˘ )b", "(｀▽´)", "(•̀ᴗ•́)✧", "(✧∀✧)", "( ͡° ͜ʖ ͡°)b"] },
+    { name: "Sick", keys: ["sick", "pain", "ill", "dizzy", "headache"], faces: ["(￣ρ￣)", "(×﹏×)", "(@_@;)", "(ᗒᗣᗕ)՞", "(╯_╰)", "(´×ω×`)", "(ノ_<)", "(ﾉ´з｀)ノ", "(＠_＠)", "(~_~;)", "(×_×;)", "(っ- ‸ – ς)"] },
+    { name: "Hurt", keys: ["hurt", "heartbreak", "broken", "betrayed", "pain"], faces: ["(╥_╥)", "(ಥ﹏ಥ)", "(´；︵；`)", "(╯︵╰,)", "(T▽T)", "( ; ω ; )", "(ᗒᗩᗕ)", "(｡ŏ﹏ŏ)", "( ´•̥̥̥ω•̥̥̥` )", "(ノ﹏ヽ)", "(っ◞‸◟c)", "( ⸝⸝´-﹏-`⸝⸝)"] },
+    { name: "Nostalgic", keys: ["nostalgic", "memory", "remember", "past", "wistful"], faces: ["( ˘ ᵕ ˘ )", "(´ω｀)", "(︶︹︶)", "(￣～￣)", "( ˘︹˘ )", "( ´ ▽ ` ).｡ｏ♡", "(｡-_-｡)", "(っ´ω`c)", "(*´ω｀*)", "( ˘•ω•˘ )", "(´-ω-`)", "( . .)"] },
+    { name: "Speechless", keys: ["speechless", "silent", "quiet", "noword", "dots"], faces: ["(・_・)", "(￣□￣;)", "(　ﾟдﾟ)", "(ー_ー)!!", "( ._. )", "(-_-)…", "( ⊙ _ ⊙ )", "(。_。)", "(￣_￣)・・・", "(¬‿¬ )…", "(ʘ_ʘ)", "( ︶︿︶)"] },
+    { name: "Shrug", keys: ["shrug", "whatever", "idk"], faces: ["¯\\_(ツ)_/¯", "┐(￣ヘ￣)┌", "╮(︶▽︶)╭", "ლ(ಠ_ಠლ)", "┐(´～｀)┌", "ヽ(ー_ー )ノ", "¯\\_(◉‿◉)_/¯", "╮(￣ω￣;)╭", "┐(‘～`;)┌"] },
+    { name: "Smug", keys: ["smug", "evil", "sus", "wink", "flirt"], faces: ["(￢‿￢)", "( ͡° ͜ʖ ͡°)", "(¬‿¬)", "ψ(｀∇´)ψ", "(^_-)", "( ͡~ ͜ʖ ͡°)", "(￣ー￣)", "(^_~)", "(◕ᴗ◕✿)", "(≖‿≖)", "( ಠ ͜ʖಠ)", "(￣ω￣)", "(*¯ ³¯*)"] },
+    { name: "Cool", keys: ["cool", "deal", "boss", "proud"], faces: ["(⌐■_■)", "( •_•)>⌐■-■", "(▀̿Ĺ̯▀̿ ̿)", "(ง'̀-'́)ง", "ᕦ(ò_óˇ)ᕤ", "(•̀ᴗ•́)و ̑̑", "(￣^￣)ゞ", "( ´ ▽ ` )b", "(b ᵔ▽ᵔ)b"] },
+    { name: "Cute", keys: ["cute", "hug", "bear", "cat", "bunny", "dog"], faces: ["(っ´▽`)っ", "ʕ•ᴥ•ʔ", "(=^･ω･^=)", "(づ￣ ³￣)づ", "₍ᐢ•ﻌ•ᐢ₎", "ʕ っ•ᴥ•ʔっ", "(=^‥^=)", "ฅ^•ﻌ•^ฅ", "(•ㅅ•)", "(・ᴥ・)", "U・ᴥ・U", "(˶˃ ᵕ ˂˶)", "(つ≧▽≦)つ", "⊂(・▽・⊂)"] },
+    { name: "Hello", keys: ["hi", "hello", "bye", "wave"], faces: ["(￣▽￣)ノ", "(*・ω・)ﾉ", "ヾ(・ω・*)", "(^０^)ノ", "( ´ ▽ ` )ﾉ", "(＾▽＾)/", "(˘▽˘)>", "ヾ(☆▽☆)", "(ﾟ▽ﾟ)/", "(｡･ω･)ﾉﾞ"] },
+    { name: "Sorry", keys: ["sorry", "bow", "please", "thanks", "thank"], faces: ["m(_ _)m", "(シ_ _)シ", "<(_ _)>", "(人◕ω◕)", "m(＿＿)m", "(〃・ω・〃)ゞ", "(._.)", "(*_ _)人", "(´｡• ω •｡`) ♡"] },
+    { name: "Hungry", keys: ["food", "eat", "hungry", "yum", "coffee"], faces: ["( ˘▽˘)っ♨", "(っ˘ڡ˘ς)", "( o˘◡˘o) ┌iii┐", "(〃￣ω￣)人(￣︶￣〃)", "♨(⋆‿⋆)♨", "(*´ڡ`●)", "( ・ω・)o-{{[〃]}}", "(っ＾▿＾)۶🍸", "(ﾟ▽ﾟ)っ☕"] },
+    { name: "Magic", keys: ["magic", "sparkle", "spell", "star"], faces: ["(ﾉ◕ヮ◕)ﾉ*:･ﾟ✧", "(∩ᄑ_ᄑ)⊃━☆ﾟ*･｡*･:≡( ε:)", "(ノ°∀°)ノ⌒･*:.｡. .｡.:*･゜ﾟ･*☆", "✧*。٩(ˊᗜˋ*)و✧*。", "(*•̀ᴗ•́*)و ̑̑ ☆", "☆*:.｡.o(≧▽≦)o.｡.:*☆", "(っ◔◡◔)っ ♥", "✩°｡⋆⸜(ू｡•ω•｡)"] },
+    { name: "Fight", keys: ["fight", "sword", "punch", "battle", "attack"], faces: ["(ง •̀_•́)ง", "(•̀o•́)ง", "ᕙ(⇀‸↼‶)ᕗ", "(ﾒ` ﾛ ´)︻デ═一", "(｀ー´)━☆ﾟ.*･｡", "( •̀ω•́ )σ", "(ﾉ ﾟｰﾟ)ﾉ⚔", "(-_-)ﾉ⌒┫ ┻ ┣", "(ง ͠° ͟ل͜ ͡°)ง"] },
+    { name: "Dead", keys: ["dead", "dying", "rip", "ded"], faces: ["(×_×)", "(✖╭╮✖)", "(x_x)", "(+_+)", "(ノ_ _)ノ", "(˚Δ˚)b", "_(:3 」∠)_", "(ꈍ_ꈍ)", "(´×ω×`)"] },
+    { name: "Sleepy", keys: ["sleepy", "tired", "sleep", "bored", "night"], faces: ["(－_－) zzZ", "(︶｡︶✽)", "(￣o￣) zzZ", "(=_=)", "(∪｡∪)｡｡｡zzZ", "(ᴗ˳ᴗ)ᶻᶻᶻ", "(-.-)Zzz", "(´〜｀*) zzz", "(￣ρ￣)..zzZZ", "( ˘ω˘ )ｽﾔｧ"] },
+    { name: "Writing", keys: ["write", "writing", "book", "read", "author"], faces: ["φ(゜▽゜*)♪", "( ˘▽˘)っ📖", "_φ(･_･", "φ(．．)", "(￣ー￣)ゞ✎", "( ・_・)ノ⌒📚", "(〃・ω・〃)ゞ📝", "( •̀ᴗ•́ )و✎"] }
+  ];
+
   function closePops() {
     if (!ed) return false;
     var any = false;
@@ -930,6 +976,11 @@
     if (toc && !toc.hidden) {
       toc.hidden = true;
       ed.root.querySelector("#aeTocBtn").setAttribute("aria-expanded", "false");
+      any = true;
+    }
+    var kao = ed.root.querySelector("#aeKao");
+    if (kao && !kao.hidden) {
+      kao.hidden = true;
       any = true;
     }
     var themes = ed.root.querySelector("#aeThemes");
@@ -1392,6 +1443,7 @@
       '<button type="button" class="ae-fmt" data-fmt="italic" aria-label="Italic" title="Italic (Ctrl/Cmd+I)"><i>I</i></button>' +
       '<button type="button" class="ae-fmt ae-img-btn" id="aeImgBtn" aria-label="Insert image" title="Insert image (or drag one into the page)"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></button>' +
       '<input type="file" id="aeImgFile" accept="image/jpeg,image/png,image/webp" hidden multiple>' +
+      '<button type="button" class="ae-fmt ae-kao-btn" id="aeKaoBtn" aria-label="Text emojis" title="Text emojis (or type : and a mood, like :sad)">ツ</button>' +
       '<span class="ae-sep" aria-hidden="true"></span>' +
       '<div class="ae-mode" role="group" aria-label="View">' +
       '<button type="button" class="ae-mode-btn on" data-action="ed-mode" data-mode="write" aria-pressed="true">Write</button>' +
@@ -1405,6 +1457,7 @@
       '<button type="button" class="ae-chip" id="aeChip" data-action="ed-settings" title="Chapter settings">x ' +
       ICON_GEAR +
       "</button>" +
+      '<div class="ae-kao" id="aeKao" hidden></div>' +
       "</div>" +
       '<div class="ae-write" id="aeWrite">' +
       '<input class="ae-title" id="aeTitle" maxlength="200" placeholder="Chapter title" autocomplete="off" aria-label="Chapter title">' +
@@ -1539,22 +1592,23 @@
     body.addEventListener("paste", function (e) {
       e.preventDefault();
       var text = (e.clipboardData || window.clipboardData).getData("text/plain") || "";
-      text = text.replace(/\r\n?/g, "\n");
-      if (!document.execCommand("insertText", false, text)) {
-        var sel = window.getSelection();
-        if (sel.rangeCount) {
-          var rng = sel.getRangeAt(0);
-          rng.deleteContents();
-          var tn = document.createTextNode(text);
-          rng.insertNode(tn);
-          rng.setStartAfter(tn);
-          rng.collapse(true);
-          sel.removeAllRanges();
-          sel.addRange(rng);
-        }
-        onEdit();
-      }
+      insertPlain(text.replace(/\r\n?/g, "\n"));
     });
+    function insertPlain(text) {
+      if (document.execCommand("insertText", false, text)) return;
+      var sel = window.getSelection();
+      if (sel.rangeCount) {
+        var rng = sel.getRangeAt(0);
+        rng.deleteContents();
+        var tn = document.createTextNode(text);
+        rng.insertNode(tn);
+        rng.setStartAfter(tn);
+        rng.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(rng);
+      }
+      onEdit();
+    }
     /* pictures: toolbar button, drag into the page, or paste */
     var savedRange = null;
     function rememberCaret() {
@@ -1653,6 +1707,86 @@
       insertImages(files, savedRange);
     });
 
+    /* text emojis: the ツ button lists them all; typing ":" + a mood (":sad") suggests some */
+    var kaoBtn = root.querySelector("#aeKaoBtn");
+    var kao = root.querySelector("#aeKao");
+    var kaoTyped = null; /* the ":word" being typed, replaced by the pick */
+    function kaoShow(groups, label) {
+      kao.innerHTML =
+        '<div class="ae-kao-head"><span>' + esc(label) + '</span><button type="button" class="ae-kao-x" aria-label="Close">×</button></div>' +
+        '<div class="ae-kao-scroll">' +
+        groups.map(function (g) {
+          return '<div class="ae-kao-name">' + esc(g.name) + '</div><div class="ae-kao-list">' +
+            g.faces.map(function (f) { return '<button type="button" class="ae-kao-face">' + esc(f) + "</button>"; }).join("") +
+            "</div>";
+        }).join("") +
+        "</div>";
+      kao.hidden = false;
+    }
+    function kaoClose() {
+      kao.hidden = true;
+      kaoTyped = null;
+    }
+    function kaoInsert(face) {
+      body.focus();
+      var sel = window.getSelection();
+      var r = null;
+      if (kaoTyped && body.contains(kaoTyped.node)) {
+        r = document.createRange();
+        r.setStart(kaoTyped.node, kaoTyped.start);
+        r.setEnd(kaoTyped.node, kaoTyped.end);
+      } else if (savedRange && body.contains(savedRange.startContainer)) {
+        r = savedRange;
+      }
+      if (r) {
+        sel.removeAllRanges();
+        sel.addRange(r);
+      }
+      kaoClose();
+      insertPlain(face + " ");
+      body.classList.remove("is-empty");
+      rememberCaret();
+    }
+    kaoBtn.addEventListener("mousedown", function (e) { e.preventDefault(); rememberCaret(); });
+    kaoBtn.addEventListener("click", function () {
+      if (!kao.hidden && !kaoTyped) return kaoClose();
+      closePops();
+      kaoTyped = null;
+      kaoShow(KAOMOJI, "Tap one to add it · tip: type :sad, :love, :shrug…");
+    });
+    kao.addEventListener("mousedown", function (e) { e.preventDefault(); });
+    kao.addEventListener("click", function (e) {
+      if (e.target.closest(".ae-kao-x")) return kaoClose();
+      var f = e.target.closest(".ae-kao-face");
+      if (f) kaoInsert(f.textContent);
+    });
+    body.addEventListener("input", function () {
+      var sel = window.getSelection();
+      var n = sel.rangeCount && sel.isCollapsed ? sel.anchorNode : null;
+      var m = n && n.nodeType === 3 ? n.nodeValue.slice(0, sel.anchorOffset).match(/(?:^|\s):([a-z]{1,15})$/i) : null;
+      var word = m ? m[1].toLowerCase() : "";
+      var hits = !word ? [] : KAOMOJI.filter(function (g) {
+        return g.keys.some(function (k) { return k.indexOf(word) === 0; });
+      });
+      if (!hits.length) {
+        if (kaoTyped) kaoClose();
+        return;
+      }
+      kaoTyped = { node: n, start: sel.anchorOffset - word.length - 1, end: sel.anchorOffset };
+      kaoShow(hits, ":" + word + " · tap one, or Tab for the first");
+    });
+    body.addEventListener("keydown", function (e) {
+      if (!kaoTyped || kao.hidden) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        kaoClose();
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        kaoInsert(kao.querySelector(".ae-kao-face").textContent);
+      }
+    });
+
     /* formatting buttons: mousedown must not steal the selection */
     root.querySelectorAll(".ae-fmt[data-fmt]").forEach(function (btn) {
       btn.addEventListener("mousedown", function (e) {
@@ -1713,7 +1847,7 @@
       }
     });
     root.addEventListener("click", function (e) {
-      if (!e.target.closest(".ae-menu-wrap,.ae-toc-wrap,.ae-sheet,.ae-chip,.ae-themebtn")) closePops();
+      if (!e.target.closest(".ae-menu-wrap,.ae-toc-wrap,.ae-sheet,.ae-chip,.ae-themebtn,.ae-kao,.ae-kao-btn")) closePops();
     });
 
     /* new chapter: start typing straight away */
@@ -1789,6 +1923,133 @@
     }
   }
 
+  /* ---------- character cards (sql/22) ---------- */
+  var CHAR_CAMERA = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/></svg>';
+
+  function charAccent(c) { return /^#[0-9a-f]{6}$/i.test((c && c.accent) || "") ? c.accent : "#d4af37"; }
+  function charFace(c, url) {
+    return url ? '<img alt="" src="' + esc(url) + '">' : '<span>' + esc(((c && c.name) || "?").trim().charAt(0).toUpperCase() || "?") + "</span>";
+  }
+
+  async function openCharacters() {
+    leaveEditor();
+    state.view = "characters";
+    state.dirty = false;
+    setTitle("Characters");
+    headActions('<button type="button" class="author-btn ghost small" data-action="back-chapters">← Chapters</button>' +
+      '<button type="button" class="author-btn primary small" data-action="new-char">+ New</button>');
+    bodyEl.innerHTML = '<p class="author-loading">Loading characters…</p>';
+    try {
+      var res = await sb.rpc("author_list_characters", { p_book_id: String(state.bookId) });
+      if (res.error) throw res.error;
+      state.chars = res.data || [];
+      bodyEl.innerHTML = state.chars.length
+        ? '<p class="char-hint">' + state.chars.length + (state.chars.length === 1 ? " card" : " cards") + " · tap one to edit</p>" +
+          '<div class="char-grid">' + state.chars.map(function (c) {
+            return '<button type="button" class="char-card" data-action="edit-char" data-id="' + esc(c.id) + '" style="--acc:' + esc(charAccent(c)) + '">' +
+              '<span class="char-face">' + charFace(c, c.portrait) + "</span>" +
+              '<span class="char-name">' + esc(c.name) + "</span>" +
+              (c.title ? '<span class="char-sub">' + esc(c.title) + "</span>" : "") +
+              '<span class="char-ch">Ch. ' + esc(c.first_chapter) + "+</span></button>";
+          }).join("") + "</div>"
+        : '<div class="author-empty"><p>No character cards yet.</p>' +
+          '<button type="button" class="author-btn primary small" data-action="new-char">+ Add the first character</button></div>';
+    } catch (e) {
+      console.error(e);
+      bodyEl.innerHTML = '<p class="author-empty">Couldn’t load characters. Has sql/22 been run?</p>';
+    }
+  }
+
+  function openCharacterForm(c) {
+    state.view = "character-form";
+    state.dirty = false;
+    c = c || { name: "", title: "", aliases: [], accent: "#d4af37", first_chapter: 1, portrait: "" };
+    setTitle(c.id ? "Edit character" : "New character");
+    headActions('<button type="button" class="author-btn ghost small" data-action="char-back">← Characters</button>');
+    var url = c.portrait || "";
+    bodyEl.innerHTML = '<form class="author-form char-form" id="authorCharForm" novalidate>' +
+      '<div class="char-photo-block">' +
+      '<button type="button" class="char-face big" id="charPrev" style="--acc:' + esc(charAccent(c)) + '" aria-label="Choose a photo from this device">' +
+      charFace(c, url) + '<span class="char-cam">' + CHAR_CAMERA + "</span></button>" +
+      '<div class="char-photo-actions">' +
+      '<button type="button" class="author-btn small" id="charPick">' + (url ? "Change photo" : "Add photo") + "</button>" +
+      '<button type="button" class="author-btn small ghost" id="charClear"' + (url ? "" : " hidden") + ">Remove</button>" +
+      '<small>From your phone or computer · JPG, PNG or WebP</small></div>' +
+      '<input type="file" id="charFile" accept="image/*" hidden>' +
+      '<input type="hidden" name="portrait" value="' + esc(url) + '"></div>' +
+      '<label>Name<input name="name" required maxlength="120" autocomplete="off" value="' + esc(c.name) + '"></label>' +
+      '<label>Title<input name="title" maxlength="200" autocomplete="off" placeholder="Shown under the name, e.g. Third Princess" value="' + esc(c.title || "") + '"></label>' +
+      '<label>Other names<input name="aliases" autocomplete="off" placeholder="Separate with commas, e.g. Hestia, Navy" value="' + esc((c.aliases || []).join(", ")) + '"></label>' +
+      '<div class="author-row">' +
+      '<label class="narrow">Card colour<input name="accent" type="color" value="' + esc(charAccent(c)) + '"></label>' +
+      '<label class="narrow">From chapter<input name="first_chapter" type="number" inputmode="numeric" min="1" step="1" value="' + esc(c.first_chapter || 1) + '"></label></div>' +
+      '<p class="char-note">Readers only see this card once they reach that chapter.</p>' +
+      '<div class="author-form-actions">' +
+      (c.id ? '<button type="button" class="author-btn small danger" id="charDelete">Delete</button>' : "") +
+      '<button type="submit" class="author-btn primary">Save</button></div></form>';
+
+    var form = document.getElementById("authorCharForm");
+    var prev = form.querySelector("#charPrev"), file = form.querySelector("#charFile"),
+        pick = form.querySelector("#charPick"), clear = form.querySelector("#charClear"),
+        submit = form.querySelector('[type="submit"]'), del = form.querySelector("#charDelete");
+    function show(u) {
+      prev.innerHTML = charFace({ name: form.name.value }, u) + '<span class="char-cam">' + CHAR_CAMERA + "</span>";
+      pick.textContent = u ? "Change photo" : "Add photo";
+      clear.hidden = !u;
+    }
+    form.addEventListener("input", function (e) {
+      state.dirty = true;
+      if (e.target.name === "accent") prev.style.setProperty("--acc", e.target.value);
+      if (e.target.name === "name" && !form.portrait.value) show("");
+    });
+    prev.addEventListener("click", function () { file.click(); });
+    pick.addEventListener("click", function () { file.click(); });
+    clear.addEventListener("click", function () { form.portrait.value = ""; state.dirty = true; show(""); });
+    file.addEventListener("change", async function () {
+      var f = file.files && file.files[0];
+      file.value = "";
+      if (!f) return;
+      prev.classList.add("is-busy"); pick.disabled = true; submit.disabled = true;
+      pick.textContent = "Uploading…";
+      try {
+        form.portrait.value = await uploadImage(f, "character");
+        state.dirty = true;
+        show(form.portrait.value);
+        toast("Photo added. Tap Save to keep it.");
+      } catch (e) {
+        show(form.portrait.value);
+        toast((e && e.message) || "Couldn’t upload the photo.");
+      }
+      prev.classList.remove("is-busy"); pick.disabled = false; submit.disabled = false;
+    });
+    if (del) del.addEventListener("click", async function () {
+      if (!confirm("Delete " + (c.name || "this character") + "’s card? Its facts are deleted too. This can’t be undone.")) return;
+      del.disabled = true;
+      var r = await sb.rpc("author_delete_character", { p_book_id: String(state.bookId), p_id: c.id });
+      del.disabled = false;
+      if (r.error) { toast(r.error.message || "Couldn’t delete."); return; }
+      state.dirty = false;
+      toast("Deleted.");
+      openCharacters();
+    });
+    form.addEventListener("submit", async function (e) {
+      e.preventDefault();
+      if (!form.name.value.trim()) { toast("Give the character a name."); form.name.focus(); return; }
+      submit.disabled = true;
+      var r = await sb.rpc("author_save_character", {
+        p_book_id: String(state.bookId), p_id: c.id || null, p_name: form.name.value, p_title: form.title.value,
+        p_aliases: form.aliases.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean),
+        p_accent: form.accent.value, p_first_chapter: parseInt(form.first_chapter.value, 10) || 1,
+        p_portrait: form.portrait.value
+      });
+      submit.disabled = false;
+      if (r.error) { toast(r.error.message || "Couldn’t save."); return; }
+      state.dirty = false;
+      toast("Saved.");
+      openCharacters();
+    });
+  }
+
   document.addEventListener("click", function (e) {
     var t = e.target.closest && e.target.closest("[data-action]");
     if (!t || !modal || !modal.contains(t)) return;
@@ -1797,6 +2058,10 @@
     var id = t.getAttribute("data-id");
 
     if (action === "new-book") openBookForm(null);
+    else if (action === "open-characters") openCharacters();
+    else if (action === "char-back") { if (!state.dirty || confirm("Leave without saving?")) openCharacters(); }
+    else if (action === "new-char") openCharacterForm(null);
+    else if (action === "edit-char") openCharacterForm((state.chars || []).find(function (c) { return String(c.id) === String(id); }));
     else if (action === "open-reports") openReports();
     else if (action === "report-done") reportAction("admin_resolve_report", { p_report_id: id });
     else if (action === "report-hide") {

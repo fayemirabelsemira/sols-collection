@@ -138,7 +138,9 @@
     return book && !(Number(book.price) === 0 && book.price !== null);
   }
 
+  var paintToken = 0;
   async function paintBookLine() {
+    var token = ++paintToken;   // several calls can overlap while status() loads; only the newest may draw
     var host = document.querySelector("#bookModal .book-features");
     var old = document.getElementById("rwBookLine");
     if (old) old.remove();
@@ -156,6 +158,7 @@
         ? "<b>" + st.available + " free chapter" + (st.available === 1 ? "" : "s") + " ready.</b> Tap a locked chapter to use " + (st.available === 1 ? "it" : "one") + "."
         : "<b>Next free chapter:</b> " + st.next_comments + "/" + st.comments_needed + " comments · " + st.next_shares + "/" + st.shares_needed + " shares";
     }
+    if (token !== paintToken) return;
     if (user()) {
       var s2 = cache[book.id] && cache[book.id].data;
       if (s2 && s2.enabled !== false && s2.shares_needed > 0) {
@@ -164,6 +167,8 @@
           (done ? "Today's share is in · " : "Share today · ") + "streak " + s2.next_shares + "/" + s2.shares_needed + " days</button>";
       }
     }
+    var stale = document.getElementById("rwBookLine");
+    if (stale) stale.remove();
     host.insertAdjacentElement("afterend", line);
   }
 

@@ -18,6 +18,21 @@
     var moreBtn = document.getElementById("commentsLoadMore");
 
     var PAGE_SIZE = 15;
+    /* GIPHY keys are meant to sit in website code; it only allows GIF searches */
+    var GIPHY_KEY = "mGJYh40uIE2cAuYEpHBudOU1qGgPlDp8";
+    var GIF_ID = /^[A-Za-z0-9]{1,64}$/;
+    /* shortcut: a GIF-only comment is saved as this text (hidden on screen) so the
+       live "comment can't be empty" rules keep working; drop it if those rules allow empty text */
+    var GIF_ONLY = "[GIF]";
+    function gifSrc(id) { return "https://media.giphy.com/media/" + id + "/200.webp"; }
+    function searchGifs(q) {
+        var url = "https://api.giphy.com/v1/gifs/" + (q ? "search?q=" + encodeURIComponent(q) + "&" : "trending?") +
+            "api_key=" + GIPHY_KEY + "&limit=24&rating=pg-13";
+        return fetch(url).then(function (r) {
+            if (!r.ok) throw new Error(r.status === 429 ? "busy" : "failed");
+            return r.json();
+        }).then(function (j) { return Array.isArray(j.data) ? j.data : []; });
+    }
     var MAX_LEN = 1000;
     var COLLAPSE_AFTER = 2;
 
@@ -31,7 +46,8 @@
         likedIds: new Set(),
         isAdmin: false,
         adminFor: null,
-        lastUserId: null
+        lastUserId: null,
+        prompt: ""
     };
 
     /* ---------- icons (Lucide) ---------- */
@@ -71,7 +87,7 @@
 
     function friendlyError(error) {
         if (error && error.code === "P0001" && error.message) return error.message;
-        return "Couldn't post your comment. Please try again.";
+        return "Couldn't post your comment. Please try again." + (error && error.code ? " (" + error.code + ")" : "");
     }
 
     function isMissingTable(error) {
@@ -115,14 +131,26 @@
         box.className = "comment-form" + (parentId ? " is-reply" : "");
         box.innerHTML =
             '<label class="comment-label" for="' + fid + '">' + label + "</label>" +
+            /* TikTok-style: a row of GIFs above the box, matching what you type */
+            '<div class="gif-strip" hidden aria-label="GIF suggestions">' +
+            '<div class="gif-row" aria-live="polite"></div>' +
+            '<p class="gif-attrib">Powered by GIPHY</p>' +
+            "</div>" +
+            '<div class="comment-gif-preview" hidden></div>' +
+            (me() ? "" :
+                '<div class="comment-guest"><label for="' + fid + '-n">Your name</label>' +
+                '<input id="' + fid + '-n" class="comment-guest-name" maxlength="24" autocomplete="nickname" placeholder="e.g. Nina">' +
+                '<button type="button" class="sol-link" data-action="login">or log in</button></div>') +
             '<div class="comment-field">' +
-            '<textarea id="' + fid + '" class="comment-input" maxlength="' + MAX_LEN + '" rows="' + (parentId ? 2 : 3) + '" ' +
+            '<textarea id="' + fid + '" class="comment-input" maxlength="' + MAX_LEN + '" rows="1" ' +
             'placeholder="' + (parentId ? "Write a reply" : "What did you think of this chapter?") + '"></textarea>' +
             '<div class="comment-form-row">' +
             '<span class="comment-counter" aria-live="polite"></span>' +
             '<div class="comment-form-buttons">' +
             (parentId ? '<button type="button" class="comment-cancel">Cancel</button>' : "") +
-            '<button type="button" class="comment-post" disabled>' + (parentId ? "Reply" : "Post") + "</button>" +
+            '<button type="button" class="comment-post" disabled aria-label="' + (parentId ? "Reply" : "Post") + '">' +
+            '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>' +
+            "</button>" +
             "</div></div></div>" +
             '<p class="comment-error" role="alert"></p>';
 
@@ -131,20 +159,87 @@
         var errEl = box.querySelector(".comment-error");
         var postBtn = box.querySelector(".comment-post");
         var cancelBtn = box.querySelector(".comment-cancel");
-        var postLabel = postBtn.textContent;
+        var picker = box.querySelector(".gif-strip");
+        var gifGrid = box.querySelector(".gif-row");
+        var preview = box.querySelector(".comment-gif-preview");
+        var gifId = null, gifTimer = null, gifToken = 0;
+        var nameIn = box.querySelector(".comment-guest-name");
+        if (nameIn) try { nameIn.value = localStorage.getItem("sol-guest-name") || ""; } catch (e) { /* private mode */ }
+
+        function showGifs(q) {
+            var token = ++gifToken;
+            gifGrid.innerHTML = '<p class="gif-note">Loading…</p>';
+            searchGifs(q).then(function (list) {
+                if (token !== gifToken) return;
+                gifGrid.innerHTML = "";
+                list.forEach(function (g) {
+                    if (!GIF_ID.test(g.id || "")) return;
+                    var b = document.createElement("button");
+                    b.type = "button";
+                    b.className = "gif-pick";
+                    b.setAttribute("aria-label", g.title || "GIF");
+                    var img = document.createElement("img");
+                    img.src = gifSrc(g.id);
+                    img.alt = "";
+                    img.loading = "lazy";
+                    b.appendChild(img);
+                    b.addEventListener("click", function () { setGif(g.id, g.title); closePicker(); });
+                    gifGrid.appendChild(b);
+                });
+                if (!gifGrid.children.length) gifGrid.innerHTML = '<p class="gif-note">No GIFs found. Try another word.</p>';
+            }, function (err) {
+                if (token !== gifToken) return;
+                gifGrid.innerHTML = '<p class="gif-note">' + (err.message === "busy"
+                    ? "Too many GIF searches right now. Try again in a bit."
+                    : "Couldn’t load GIFs. Check your connection.") + "</p>";
+            });
+        }
+        function closePicker() { picker.hidden = true; clearTimeout(gifTimer); gifToken++; }
+        function setGif(id, title) {
+            gifId = id;
+            preview.innerHTML = "";
+            if (id) {
+                var img = document.createElement("img");
+                img.src = gifSrc(id);
+                img.alt = title || "GIF";
+                var rm = document.createElement("button");
+                rm.type = "button";
+                rm.className = "comment-gif-remove";
+                rm.setAttribute("aria-label", "Remove GIF");
+                rm.textContent = "×";
+                rm.addEventListener("click", function () { setGif(null); });
+                preview.append(img, rm);
+            }
+            preview.hidden = !id;
+            syncForm();
+        }
+        /* GIFs matching what you type appear by themselves once you pause typing
+           (the wait saves GIPHY searches); hidden when the box is empty or a GIF is picked */
+        ta.addEventListener("input", function () {
+            var q = ta.value.trim();
+            clearTimeout(gifTimer);
+            if (q.length < 2 || gifId) { closePicker(); return; }
+            gifTimer = setTimeout(function () { picker.hidden = false; showGifs(q.slice(-50)); }, 700);
+        });
 
         /* the counter only appears when it matters (near the limit) */
         function syncForm() {
             var n = ta.value.length;
             counter.textContent = n >= MAX_LEN * 0.8 ? (MAX_LEN - n) + " characters left" : "";
-            postBtn.disabled = !ta.value.trim();
+            postBtn.disabled = !ta.value.trim() && !gifId;
         }
 
         if (prefill) ta.value = prefill;
         syncForm();
 
+        function fit() {
+            ta.style.height = "auto";
+            ta.style.height = Math.min(ta.scrollHeight, 200) + "px";
+            ta.style.overflowY = ta.scrollHeight > 200 ? "auto" : "hidden";   // scrollbar only once it stops growing
+        }   // grows as you type, like TikTok
         ta.addEventListener("input", function () {
             syncForm();
+            fit();
             errEl.textContent = "";
         });
 
@@ -161,29 +256,41 @@
         async function submit() {
             var text = ta.value.trim();
 
-            if (!text) return;
+            if (!text && !gifId) return;
 
-            if (!me()) {
-                openModal("loginModal");
+            var guestName = nameIn ? nameIn.value.trim() : "";
+            if (!me() && guestName.length < 2) {
+                errEl.textContent = "Type your name (at least 2 letters), or log in.";
+                nameIn.focus();
                 return;
             }
 
             postBtn.disabled = true;
-            postBtn.textContent = "Posting…";
+            postBtn.classList.add("is-busy");
             box.setAttribute("aria-busy", "true");
             errEl.textContent = "";
 
-            var res = await sb.from("comments")
+            var res = !me()
+                ? await sb.rpc("post_guest_comment", {   // guests post through sql/20, with its own limits
+                    p_chapter_id: String(state.chapterId),
+                    p_device: typeof deviceId === "function" ? deviceId() : null,
+                    p_name: guestName,
+                    p_body: text,
+                    p_parent_id: parentId || null,
+                    p_gif_id: gifId || null
+                })
+                : await sb.from("comments")
                 .insert({
                     book_id: String(state.bookId),
                     chapter_id: String(state.chapterId),
                     parent_id: parentId || null,
-                    body: text
+                    body: text || GIF_ONLY,
+                    gif_id: gifId || undefined   // left out entirely without a GIF, so posting still works before sql/18 is run
                 })
                 .select()
                 .single();
 
-            postBtn.textContent = postLabel;
+            postBtn.classList.remove("is-busy");
             box.removeAttribute("aria-busy");
 
             if (res.error) {
@@ -193,8 +300,10 @@
                 return;
             }
 
+            if (nameIn) try { localStorage.setItem("sol-guest-name", guestName); } catch (e) { /* private mode */ }
             ta.value = "";
-            syncForm();
+            setGif(null);
+            closePicker();
 
             addNewComment(res.data);
             document.dispatchEvent(new CustomEvent("sol:commented", { detail: { bookId: String(state.bookId) } }));
@@ -207,14 +316,11 @@
 
     function renderComposer() {
         composerEl.innerHTML = "";
-
-        if (!me()) {
-            composerEl.innerHTML =
-                '<div class="comment-login">' +
-                '<p><strong>Join the conversation</strong><span>Log in to comment on this chapter.</span></p>' +
-                '<button type="button" class="comment-post" data-action="login">Log in</button>' +
-                "</div>";
-            return;
+        if (state.prompt) {   // the chapter's conversation starter, set by the author
+            var pr = document.createElement("p");
+            pr.className = "comment-prompt";
+            pr.textContent = state.prompt;
+            composerEl.appendChild(pr);
         }
 
         composerEl.appendChild(buildComposer(null, "", null));
@@ -225,12 +331,15 @@
     function bodyHTML(c) {
         var A = window.SolApp;
         var mine = me() && c.user_id === me().id;
+        var hasGif = c.gif_id && GIF_ID.test(c.gif_id);
+        var gif = hasGif ? '<img class="comment-gif" src="' + gifSrc(c.gif_id) + '" alt="GIF" loading="lazy">' : "";
+        var text = hasGif && String(c.body).trim() === GIF_ONLY ? "" : esc(c.body);
         if (!mine && A && A.aheadOf && A.aheadOf(state.bookId, c.reader_chapter)) {
             return '<p class="comment-body sol-ahead" data-reveal tabindex="0" role="button" aria-label="Possible spoiler. Tap to show.">' +
                 '<span class="sol-ahead-note">Possible spoiler · written by a reader at ' + esc(chapterName(c.reader_chapter)) + '. Tap to show.</span>' +
-                '<span class="sol-ahead-text">' + esc(c.body) + "</span></p>";
+                '<span class="sol-ahead-text">' + text + gif + "</span></p>";
         }
-        return '<p class="comment-body">' + esc(c.body) + "</p>";
+        return (text ? '<p class="comment-body">' + text + "</p>" : "") + gif;
     }
 
     document.addEventListener("click", function (e) {
@@ -444,7 +553,10 @@
         listEl.innerHTML = '<p class="comments-empty is-loading" aria-busy="true">Loading comments\u2026</p>';
         moreBtn.classList.add("hidden");
 
+        var prompt = sb.rpc("get_chapter_prompt", { p_chapter_id: String(state.chapterId) })
+            .then(function (res) { return res && !res.error && typeof res.data === "string" ? res.data : ""; }, function () { return ""; });
         await checkAdmin();
+        state.prompt = await prompt;
 
         if (token !== state.token) return;
 
@@ -505,11 +617,6 @@
     }
 
     function openReplyBox(btn) {
-        if (!me()) {
-            openModal("loginModal");
-            return;
-        }
-
         var el = btn.closest(".comment");
         var isReply = el.classList.contains("reply");
         var topEl = isReply ? el.closest(".comment:not(.reply)") : el;

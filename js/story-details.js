@@ -97,8 +97,6 @@
     if (book.is_mature) bits.push('<span class="sol-chip mature">18+</span>');
     if (s) {
       bits.push('<span class="sol-chip plain">' + s.chapter_count + (s.chapter_count === 1 ? " chapter" : " chapters") + "</span>");
-      var rt = A.readTime(s.word_count);
-      if (rt) bits.push('<span class="sol-chip plain">≈ ' + rt + "</span>");
       if (s.last_updated) bits.push('<span class="sol-chip plain">Updated ' + A.timeAgo(s.last_updated) + "</span>");
     }
     if (book.language) bits.push('<span class="sol-chip plain">' + esc(book.language) + "</span>");

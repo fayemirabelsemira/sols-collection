@@ -382,7 +382,19 @@
         }
         floatEl.addEventListener("mousedown", hold);
         floatEl.addEventListener("touchstart", hold, { passive: false });
+        /* iPhone Safari sends no "click" after a touchstart that called preventDefault,
+           so on touch screens the tap is handled when the finger lifts */
+        var lastTouch = 0;
+        floatEl.addEventListener("touchend", function (e) {
+            e.preventDefault();
+            lastTouch = Date.now();
+            act(e);
+        }, { passive: false });
         floatEl.addEventListener("click", function (e) {
+            if (Date.now() - lastTouch < 800) { e.preventDefault(); return; }   // already handled by touchend
+            act(e);
+        });
+        function act(e) {
             e.preventDefault();
             e.stopPropagation();
             if (floatMode === "add") {
@@ -394,7 +406,7 @@
                 hideFloat();
                 removeMany(ids);
             }
-        });
+        }
         document.body.appendChild(floatEl);
         return floatEl;
     }

@@ -196,13 +196,7 @@
     var book = typeof currentBook !== "undefined" ? currentBook : null;
     if (!host || !book) return;
     var btn = document.getElementById("offlineButton");
-    if (!btn) {
-      btn = document.createElement("button");
-      btn.id = "offlineButton";
-      btn.type = "button";
-      btn.className = "vote-button share-button";
-      host.appendChild(btn);
-    }
+    if (!btn) return; // the "Save offline" button was removed from the book page
     var id = String(book.id);
     if (busy && busy.id === id) {
       btn.disabled = true;

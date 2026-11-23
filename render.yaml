@@ -1,0 +1,39 @@
+# Render setup (free static site). Render reads this when you choose New -> Blueprint.
+# The headers below are copied from _headers; tests/security.test.mjs checks they stay the same.
+services:
+  - type: web
+    name: solreads
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: ./dist
+    headers:
+      - path: /*
+        name: Content-Security-Policy
+        value: "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/ https://cdn.jsdelivr.net/npm/dompurify@3.2.6/ https://cdn.jsdelivr.net/npm/gsap@3.12.5/ https://cdn.jsdelivr.net/npm/lenis@1.1.14/ https://static.cloudflareinsights.com/beacon.min.js; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://api.giphy.com https://cloudflareinsights.com https://cdn.jsdelivr.net https://fonts.googleapis.com https://fonts.gstatic.com https://whxtkvavyisbvisdemhn.supabase.co wss://whxtkvavyisbvisdemhn.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      - path: /*
+        name: X-Content-Type-Options
+        value: "nosniff"
+      - path: /*
+        name: Strict-Transport-Security
+        value: "max-age=31536000"
+      - path: /*
+        name: Cross-Origin-Opener-Policy
+        value: "same-origin"
+      - path: /*
+        name: Referrer-Policy
+        value: "strict-origin-when-cross-origin"
+      - path: /*
+        name: X-Frame-Options
+        value: "DENY"
+      - path: /*
+        name: Permissions-Policy
+        value: "camera=(), microphone=(), geolocation=(), payment=()"
+      - path: /sw.js
+        name: Cache-Control
+        value: "no-cache"
+      - path: /manifest.webmanifest
+        name: Content-Type
+        value: "application/manifest+json"
+      - path: /manifest.webmanifest
+        name: Cache-Control
+        value: "no-cache"

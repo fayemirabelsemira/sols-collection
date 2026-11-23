@@ -3246,15 +3246,15 @@ function startViewTimer(chapter) {
         clearTimeout(viewTimer);
     }
 
-    const key = `viewed-chapter-${chapter.id}`;
+    const key = `chapter-view-${chapter.id}`; // new name: "viewed-chapter-" marks were set under the old once-per-book count
 
     if (localStorage.getItem(key) === "true") {
 
         return;
     }
 
-    /* 8 seconds on a chapter counts as reading it (was 30s, so quick
-       readers never counted). Works for guests too. */
+    /* 1 second on a chapter counts as a view; every chapter counts once
+       per reader (sql/19). Works for guests too. */
     viewTimer = setTimeout(
         async () => {
 
@@ -3262,12 +3262,12 @@ function startViewTimer(chapter) {
 
             /* only a cache so we skip pointless calls; the server decides.
                Saved only when the call worked, so a failure is retried. */
-            if (await incrementViews(currentBook.id)) {
+            if (await incrementChapterViews(currentBook.id, chapter.id)) {
 
                 try { localStorage.setItem(key, "true"); } catch (e) { /* private mode */ }
             }
         },
-        8000
+        1000
     );
 }
 
@@ -3324,30 +3324,7 @@ async function incrementViews(bookId) {
             res = await supabaseClient.rpc("increment_views_guest", { p_book_id: bookId, p_device: device });
         }
 
-        if (res.error) {
-
-            console.error("View increment error:", res.error);
-
-            return false;
-        }
-
-        if (res.data !== null && res.data !== undefined) {
-
-            book.views = Number(res.data) || 0;
-
-            applySort(currentSort);
-
-            updateReaderStats(book);
-
-            const modalViews = document.getElementById("modalViewCount");
-
-            if (modalViews && currentBook && currentBook.id === bookId) {
-
-                modalViews.textContent = book.views.toLocaleString();
-            }
-        }
-
-        return true;
+        return showViews(bookId, res);
 
     } catch (err) {
 
@@ -3355,6 +3332,58 @@ async function incrementViews(bookId) {
 
         return false;
     }
+}
+
+/* A chapter read: one view per reader per chapter (sql/19).
+   Until sql/19 is run, falls back to the old once-per-book count. */
+async function incrementChapterViews(bookId, chapterId) {
+
+    try {
+
+        const res = await supabaseClient.rpc("increment_chapter_views",
+            currentUser ? { p_chapter_id: chapterId } : { p_chapter_id: chapterId, p_device: deviceId() });
+
+        if (res.error && (res.error.code === "PGRST202" || res.error.code === "42883")) return incrementViews(bookId);
+
+        return showViews(bookId, res);
+
+    } catch (err) {
+
+        console.error("Failed to count chapter view:", err);
+
+        return false;
+    }
+}
+
+/* puts the server's new view total on screen; false when the call failed */
+function showViews(bookId, res) {
+
+    const book = books.find(b => b.id === bookId);
+
+    if (res.error || !book) {
+
+        if (res.error) console.error("View increment error:", res.error);
+
+        return false;
+    }
+
+    if (res.data !== null && res.data !== undefined) {
+
+        book.views = Number(res.data) || 0;
+
+        applySort(currentSort);
+
+        updateReaderStats(book);
+
+        const modalViews = document.getElementById("modalViewCount");
+
+        if (modalViews && currentBook && currentBook.id === bookId) {
+
+            modalViews.textContent = book.views.toLocaleString();
+        }
+    }
+
+    return true;
 }
 
 /* a click on a book counts a view once per session */

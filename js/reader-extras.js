@@ -45,7 +45,7 @@
         return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + paths + "</svg>";
     }
     var I = {
-        users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+        tree: '<rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/>',
         history: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
         close: '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
         back: '<path d="m15 18-6-6 6-6"/>',
@@ -269,7 +269,7 @@
             '<div class="cx-backdrop"></div>' +
             '<section class="cx-sheet" role="dialog" aria-modal="true" aria-label="Characters">' +
             '<div class="cx-grip"></div>' +
-            '<button class="cx-back" type="button" aria-label="Back to cast">' + icon(I.back, 18) + "</button>" +
+            '<button class="cx-back" type="button" aria-label="Back to family tree">' + icon(I.back, 18) + "</button>" +
             '<button class="cx-close" type="button" aria-label="Close">' + icon(I.close, 18) + "</button>" +
             '<div class="cx-body"></div></section>';
         document.body.appendChild(layer);
@@ -277,7 +277,7 @@
         backBtn = layer.querySelector(".cx-back");
         layer.querySelector(".cx-backdrop").addEventListener("click", closeSheet);
         layer.querySelector(".cx-close").addEventListener("click", closeSheet);
-        backBtn.addEventListener("click", function () { renderCast(); });
+        backBtn.addEventListener("click", function () { renderFamily(); });
         sheetBody.addEventListener("scroll", function () {
             layer.querySelector(".cx-sheet").classList.toggle("scrolled", sheetBody.scrollTop > 60);
         }, { passive: true });
@@ -373,6 +373,289 @@
         sheetBody.scrollTop = 0;
     }
 
+    function byName(name) {
+        for (var i = 0; i < cast.length; i++) if (cast[i].name === name) return cast[i];
+        return null;
+    }
+    /* family tree chart: houses are boxes (parents row over children row), solid
+       arrows = parent -> child, dashed labelled lines = links between people.
+       To keep lines short, each house is placed under the people it links to.
+       Tap a person to light up only their lines; drag or scroll to move; -/+ to zoom. */
+    var FT = { w: 150, h: 54, gap: 12, pad: 14, title: 30, rowGap: 46, houseGap: 40, rowSpace: 70, maxW: 1100 };
+    function drawFamily(rows) {
+        var NS = "http://www.w3.org/2000/svg";
+        var houses = [], byHouse = {}, nodes = [];
+        function house(key, name) {
+            if (!byHouse[key]) { byHouse[key] = { name: name || key, gens: [[], []] }; houses.push(byHouse[key]); }
+            return byHouse[key];
+        }
+        function addNode(name, note, houseKey, gen, houseName) {
+            var n = { name: name, note: note, house: houseKey, i: nodes.length };
+            house(houseKey, houseName).gens[gen].push(n);
+            nodes.push(n);
+            return n;
+        }
+        function find(name, houseKey) {
+            for (var i = 0; i < nodes.length; i++)
+                if (nodes[i].name === name && (!houseKey || nodes[i].house === houseKey)) return nodes[i];
+            return null;
+        }
+        rows.forEach(function (r) { if (r.kind === "member") addNode(r.name, r.note, r.house, r.gen ? 1 : 0); });
+        var links = rows.filter(function (r) { return r.kind !== "member"; });
+        // someone in a link who sits in no house gets a small box of their own, placed near who they link to
+        links.forEach(function (r) {
+            [r.name, r.related].forEach(function (nm) {
+                if (nm && !find(nm)) addNode(nm, null, "solo:" + nm, 1, "Unknown bloodline");
+            });
+        });
+        houses.forEach(function (h) {
+            var cols = Math.max(h.gens[0].length, h.gens[1].length, 1);
+            h.w = cols * (FT.w + FT.gap) - FT.gap + FT.pad * 2;
+            var used = h.gens.filter(function (g) { return g.length; }).length;
+            h.h = FT.title + used * FT.h + (used - 1) * FT.rowGap + FT.pad;
+            h.members = h.gens[0].concat(h.gens[1]);
+        });
+        function placeNodes(h) {
+            var ry = h.y + FT.title;
+            h.gens.forEach(function (g) {
+                if (!g.length) return;
+                var rowW = g.length * (FT.w + FT.gap) - FT.gap, sx = h.x + (h.w - rowW) / 2;
+                g.forEach(function (n, k) { n.x = sx + k * (FT.w + FT.gap); n.y = ry; });
+                ry += FT.h + FT.rowGap;
+            });
+        }
+        // where a house would like to sit: under the middle of the placed people it links to
+        // (anyPlace: count links to people not placed yet too, to tell "linked" houses apart)
+        function wish(h, anyPlace) {
+            var xs = [];
+            links.forEach(function (r) {
+                var a = find(r.name, r.kind === "tie" ? r.house : null) || find(r.name), b = find(r.related);
+                if (!a || !b) return;
+                if (a.house === h.key && (anyPlace || b.x != null) && b.house !== h.key) xs.push(b.x + FT.w / 2);
+                if (b.house === h.key && (anyPlace || a.x != null) && a.house !== h.key) xs.push(a.x + FT.w / 2);
+            });
+            return xs.length ? xs.reduce(function (s, v) { return s + v; }, 0) / xs.length : null;
+        }
+        Object.keys(byHouse).forEach(function (k) { byHouse[k].key = k; });
+        var left = houses.slice(), y = 0, W = 0;
+        var maxW = Math.max(FT.maxW, Math.max.apply(null, houses.map(function (h) { return h.w; })));
+        while (left.length) {
+            // next row: houses linked to what is already placed, ordered left to right by where they want to be
+            var cand = left.map(function (h) { return { h: h, x: wish(h) }; }).filter(function (c) { return c.x != null; });
+            if (!cand.length) cand = [{ h: left[0], x: 0 }];
+            cand.sort(function (a, b) { return a.x - b.x; });
+            var cursor = 0, rowH = 0, placed = [];
+            cand.forEach(function (c) {
+                var x = Math.max(cursor, Math.min(c.x - c.h.w / 2, maxW - c.h.w));
+                if (x + c.h.w > maxW + 1) return;
+                c.h.x = x; c.h.y = y; placeNodes(c.h);
+                cursor = x + c.h.w + FT.houseGap; rowH = Math.max(rowH, c.h.h); W = Math.max(W, x + c.h.w);
+                placed.push(c.h);
+            });
+            // fill the rest of the row only with houses linked to nothing placed;
+            // a linked house waits for the next row so its lines run straight down
+            left.forEach(function (h) {
+                if (h.x != null || wish(h, true) != null || cursor + h.w > maxW) return;
+                h.x = cursor; h.y = y; placeNodes(h);
+                cursor += h.w + FT.houseGap; rowH = Math.max(rowH, h.h); W = Math.max(W, h.x + h.w);
+                placed.push(h);
+            });
+            left = left.filter(function (h) { return placed.indexOf(h) < 0; });
+            y += rowH + FT.rowSpace;
+        }
+        var H = y - FT.rowSpace + 8;
+
+        var stage = el("div", "ft-stage");
+        stage.style.width = W + "px";
+        stage.style.height = H + "px";
+        var svg = document.createElementNS(NS, "svg");
+        svg.setAttribute("width", W); svg.setAttribute("height", H);
+        svg.setAttribute("class", "ft-lines");
+        svg.setAttribute("aria-hidden", "true");
+        svg.innerHTML = '<defs><marker id="ftArrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8a8478"/></marker></defs>';
+        stage.appendChild(svg);
+        var lineEls = [];   // {el, a, b} so a selected person can light up their own lines
+        function path(d, cls, a, b) {
+            var p = document.createElementNS(NS, "path");
+            p.setAttribute("d", d); p.setAttribute("class", cls);
+            svg.appendChild(p);
+            lineEls.push({ el: p, a: a, b: b });
+        }
+        var pills = [];
+        function pill(text, px, py, a, b) {
+            houses.forEach(function (h) {   // keep labels off house titles: lift into the gap above
+                if (px > h.x - 40 && px < h.x + h.w + 40 && py > h.y - 12 && py < h.y + FT.title + 4) py = h.y - 18;
+            });
+            for (var k = 0; k < pills.length; k++)   // don't stack labels on each other
+                if (Math.abs(pills[k].x - px) < 90 && Math.abs(pills[k].y - py) < 22) { py = pills[k].y + 24; k = -1; }
+            var t = el("span", "ft-pill", text);
+            t.style.left = px + "px"; t.style.top = py + "px";
+            pills.push({ x: px, y: py, el: t });
+            lineEls.push({ el: t, a: a, b: b });
+        }
+        houses.forEach(function (h) {
+            var box = el("div", "ft-house");
+            box.style.cssText = "left:" + h.x + "px;top:" + h.y + "px;width:" + h.w + "px;height:" + h.h + "px";
+            box.appendChild(el("span", "ft-house-name", h.name));
+            stage.appendChild(box);
+        });
+        var parentIdx = {};
+        links.forEach(function (r) {
+            if (r.kind === "parent") {
+                var p = find(r.name, r.house), c = find(r.related, r.house);
+                if (!p || !c) return;
+                if (parentIdx[r.name] == null) parentIdx[r.name] = Object.keys(parentIdx).length % 3;
+                var px = p.x + FT.w / 2, cx = c.x + FT.w / 2, top = p.y + FT.h;
+                var mid = top + FT.rowGap / 2 - 4 + parentIdx[r.name] * 5;
+                path("M" + px + " " + top + "V" + mid + "H" + cx + "V" + (c.y - 2), "ft-parent", p, c);
+                if (r.note) pill(r.note, cx, mid + (c.y - mid) / 2, p, c);
+                return;
+            }
+            var a = find(r.name, r.house) || find(r.name), b = null, best = Infinity;
+            if (!a) return;
+            nodes.forEach(function (n) {   // a person in two houses: use the nearer box
+                if (n.name !== r.related || n === a) return;
+                var d = Math.abs(n.x - a.x) + Math.abs(n.y - a.y);
+                if (d < best) { best = d; b = n; }
+            });
+            if (!b) return;
+            var up = a.y <= b.y ? a : b, dn = up === a ? b : a;
+            var ux = up.x + FT.w / 2, dx = dn.x + FT.w / 2, d, mx, my;
+            if (Math.abs(up.y - dn.y) < 10) {
+                // same row: a low arch over the tops of both boxes
+                var ty = up.y, lift = Math.min(60, 26 + Math.abs(ux - dx) / 8);
+                d = "M" + ux + " " + ty + "C" + ux + " " + (ty - lift) + " " + dx + " " + (ty - lift) + " " + dx + " " + ty;
+                mx = (ux + dx) / 2; my = ty - lift * 0.75;
+            } else {
+                // bottom of the upper box to the top of the lower box, leaving and arriving straight
+                var y1 = up.y + FT.h, y2 = dn.y, k2 = Math.max(30, (y2 - y1) / 2);
+                d = "M" + ux + " " + y1 + "C" + ux + " " + (y1 + k2) + " " + dx + " " + (y2 - k2) + " " + dx + " " + y2;
+                mx = (ux + dx) / 2; my = (y1 + y2) / 2;
+            }
+            path(d, "ft-tie", a, b);
+            pill(r.note || "", mx, my, a, b);
+        });
+
+        var sel = null;
+        function select(n) {
+            sel = sel === n ? null : n;
+            stage.classList.toggle("ft-focus", !!sel);
+            lineEls.forEach(function (l) { l.el.classList.toggle("on", !!sel && (l.a === sel || l.b === sel)); });
+            nodes.forEach(function (m) {
+                var linked = sel && (m === sel || lineEls.some(function (l) { return (l.a === sel && l.b === m) || (l.b === sel && l.a === m); }));
+                m.el.classList.toggle("on", !!linked);
+                m.el.setAttribute("aria-pressed", String(m === sel));
+            });
+        }
+        nodes.forEach(function (n) {
+            var ch = byName(n.name);
+            var b = el("button", "ft-node" + (ch ? " ft-has-card" : ""));
+            b.type = "button";
+            b.style.left = n.x + "px"; b.style.top = n.y + "px";
+            b.setAttribute("aria-pressed", "false");
+            b.appendChild(el("b", "", n.name));
+            if (n.note) b.appendChild(el("span", "", n.note));
+            b.addEventListener("click", function () { if (!stage.dragged) select(n); });
+            n.el = b;
+            stage.appendChild(b);
+            if (ch) {
+                var go = el("button", "ft-open", "View card");
+                go.type = "button";
+                go.style.left = (n.x + FT.w / 2) + "px"; go.style.top = (n.y + FT.h) + "px";
+                go.addEventListener("click", function () { renderCard(ch, true); });
+                stage.appendChild(go);
+                n.go = go;
+            }
+        });
+        // the "View card" button shows under the selected person only
+        var baseSelect = select;
+        select = function (n) {
+            baseSelect(n);
+            nodes.forEach(function (m) { if (m.go) m.go.classList.toggle("show", m === sel); });
+        };
+        pills.forEach(function (p) { stage.appendChild(p.el); });   // labels sit above the boxes
+
+        /* viewport: scroll with a finger, drag with a mouse, zoom with the buttons */
+        var view = el("div", "ft-view");
+        view.appendChild(stage);
+        var zoom = 1;
+        function setZoom(z) {
+            var cx = (view.scrollLeft + view.clientWidth / 2) / zoom, cy = (view.scrollTop + view.clientHeight / 2) / zoom;
+            zoom = Math.max(0.35, Math.min(1.5, z));
+            stage.style.zoom = zoom;
+            view.scrollLeft = cx * zoom - view.clientWidth / 2;
+            view.scrollTop = cy * zoom - view.clientHeight / 2;
+        }
+        function fit() { return Math.min(1, (view.clientWidth - 8) / W); }
+        var drag = null;
+        view.addEventListener("pointerdown", function (e) {
+            if (e.pointerType !== "mouse" || e.button !== 0) return;   // fingers scroll natively
+            drag = { x: e.clientX, y: e.clientY, l: view.scrollLeft, t: view.scrollTop };
+            stage.dragged = false;
+        });
+        view.addEventListener("pointermove", function (e) {
+            if (!drag) return;
+            var dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+            if (!stage.dragged && Math.abs(dx) + Math.abs(dy) > 5) {
+                stage.dragged = true; view.classList.add("dragging");
+                view.setPointerCapture(e.pointerId);   // only once it's a real drag, so plain clicks still reach the boxes
+            }
+            if (stage.dragged) { view.scrollLeft = drag.l - dx; view.scrollTop = drag.t - dy; }
+        });
+        function endDrag() {
+            if (!drag) return;
+            drag = null; view.classList.remove("dragging");
+            setTimeout(function () { stage.dragged = false; }, 0);   // let the click after a drag be ignored first
+        }
+        view.addEventListener("pointerup", endDrag);
+        view.addEventListener("pointercancel", endDrag);
+
+        var bar = el("div", "ft-bar");
+        function zbtn(label, aria, fn) {
+            var b = el("button", "ft-zoom", label);
+            b.type = "button"; b.setAttribute("aria-label", aria);
+            b.addEventListener("click", fn);
+            bar.appendChild(b);
+        }
+        zbtn("−", "Zoom out", function () { setZoom(zoom - 0.15); });
+        zbtn("Fit", "Fit the whole tree", function () { setZoom(fit()); view.scrollLeft = 0; view.scrollTop = 0; });
+        zbtn("+", "Zoom in", function () { setZoom(zoom + 0.15); });
+
+        var wrap = el("div", "ft-wrap");
+        wrap.appendChild(bar);
+        wrap.appendChild(view);
+        // start readable: whole width if the text stays legible, else 70% and scroll
+        requestAnimationFrame(function () { setZoom(Math.max(fit(), 0.7)); view.scrollLeft = 0; view.scrollTop = 0; });
+        return wrap;
+    }
+    /* family tree: the sheet's home view; server-filtered to the reader's chapter like the cards.
+       Books without a tree get the cast grid instead, so their cards stay reachable. */
+    function renderFamily(done) {
+        var st = rs();
+        if (!st.book) return;
+        ensureSheet();
+        var token = castToken;
+        rpc("get_family", { p_book_id: String(st.book.id), p_up_to: upTo() }).then(function (rows) {
+            if (token !== castToken) return;
+            if (!Array.isArray(rows) || !rows.length) { renderCast(); if (typeof done === "function") done(); return; }
+            sheetState = { view: "family", id: null };
+            backBtn.classList.remove("show");
+            setSheetAccent("#ff6a4d");
+            sheetBody.innerHTML = "";
+            var top = el("header", "cx-top cx-ft-top");
+            top.appendChild(el("p", "cx-eyebrow", "BLOODLINES"));
+            top.appendChild(el("h2", "cx-title", "Family tree"));
+            sheetBody.appendChild(top);
+            var main = el("div", "cx-main cx-ft");
+            main.appendChild(el("p", "ft-hint", "Tap a person to light up their links \u00b7 drag or scroll to move around"));
+            main.appendChild(drawFamily(rows));
+            sheetBody.appendChild(main);
+            sheetBody.appendChild(throughLine());
+            sheetBody.scrollTop = 0;
+            if (typeof done === "function") done();
+        });
+    }
+
     function renderCard(ch, fromCast) {
         ensureSheet();
         sheetState = { view: "card", id: ch.id };
@@ -464,10 +747,9 @@
         sheetBody.scrollTop = 0;
     }
 
-    function openCast() {
-        var st = rs();
-        if (!st.chapter) { toast("Open a chapter first."); return; }
-        loadCast(function () { renderCast(); openSheet(); });
+    function openFamily() {
+        if (!rs().chapter) { toast("Open a chapter first."); return; }
+        loadCast(function () { renderFamily(openSheet); });   // cast first, so tree boxes can open cards
     }
 
     /* =========================================================
@@ -841,15 +1123,15 @@
 
     function injectButtons() {
         var anchor = document.getElementById("bookmarkHere");
-        if (!anchor || document.getElementById("cxCastBtn")) return;
+        if (!anchor || document.getElementById("cxTreeBtn")) return;
 
-        var cast = el("button", "toolbar-btn bm-toolbar-btn");
-        cast.id = "cxCastBtn";
-        cast.type = "button";
-        cast.title = "Characters";
-        cast.setAttribute("aria-label", "Characters");
-        cast.innerHTML = icon(I.users, 18);
-        cast.addEventListener("click", openCast);
+        var tree = el("button", "toolbar-btn bm-toolbar-btn");
+        tree.id = "cxTreeBtn";
+        tree.type = "button";
+        tree.title = "Family tree";
+        tree.setAttribute("aria-label", "Family tree");
+        tree.innerHTML = icon(I.tree, 18);
+        tree.addEventListener("click", openFamily);
 
         var rec = el("button", "toolbar-btn bm-toolbar-btn");
         rec.id = "rcBtn";
@@ -859,8 +1141,8 @@
         rec.innerHTML = icon(I.history, 18);
         rec.addEventListener("click", manualRecap);
 
-        anchor.insertAdjacentElement("afterend", cast);
-        cast.insertAdjacentElement("afterend", rec);
+        anchor.insertAdjacentElement("afterend", tree);
+        tree.insertAdjacentElement("afterend", rec);
     }
 
     function onRender() {

@@ -1,7 +1,7 @@
 /* Sol — calmer reader toolbar on phones (≤700px).
    Bar shows: Chapters · Bookmark · Aa · •••
    "Aa" sheet  = text size + page colors (+ link to the full customizer)
-   "•••" menu  = Characters, Previously on…
+   "•••" menu  = Family tree (opens character cards), Previously on…
    One bar on phones; the floating button hides/shows it.
    Load AFTER reader-extras.js. The original buttons are MOVED, never copied,
    so all their existing behaviour keeps working. */
@@ -41,7 +41,7 @@
   /* ---- ••• menu ---- */
   const menu = mk('div', 'rd-menu'); menu.hidden = true;
   const ico = d => '<svg class="rd-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
-  const ICON_CAST = ico('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>');
+  const ICON_TREE = ico('<rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M5 16v-3a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v3"/><path d="M12 12V8"/>');
   const ICON_RECAP = ico('<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>');
   const item = (label, id, icon, hint) => {
     const b = mk('button', 'rd-item', icon + '<span class="rd-item-text"><span class="rd-item-label">' + label + '</span><span class="rd-item-hint">' + hint + '</span></span>'); b.type = 'button';
@@ -49,7 +49,7 @@
     return b;
   };
   menu.setAttribute('role', 'menu');
-  menu.append(item('Characters', 'cxCastBtn', ICON_CAST, 'Who\u2019s who so far'), item('Previously on\u2026', 'rcBtn', ICON_RECAP, 'Catch up on recent chapters'));
+  menu.append(item('Family tree', 'cxTreeBtn', ICON_TREE, 'Characters and bloodlines'), item('Previously on\u2026', 'rcBtn', ICON_RECAP, 'Catch up on recent chapters'));
 
   section.append(sheet, menu);
 
